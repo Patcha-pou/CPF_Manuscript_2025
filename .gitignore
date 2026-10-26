@@ -12,7 +12,9 @@
 **/Mic/*
 **/Mic_DiD/*
 **/panels/*
-**/Unuse*
+**/Unusefig_S6_KO.r
+**/unUsefig_S6_pathway.r
+**/unUsephyloseq_prep.r
 
 # Ignore environment-specific and temporary files
 .Rhistory
