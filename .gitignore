@@ -1,9 +1,5 @@
 # Ignore Singularity/Apptainer image files
 *.sif
-*.png
-*.svg
-*.csv
-*xlsx
 
 # Ignore large raw data folders
 # Data should be stored elsewhere
