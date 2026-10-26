@@ -1,0 +1,29 @@
+# Ignore Singularity/Apptainer image files
+*.sif
+*.png
+*.svg
+*.csv
+*xlsx
+
+# Ignore large raw data folders
+# Data should be stored elsewhere
+**/raw_data/*
+
+# Ignore all output and intermediate folders
+**/input/*
+**/Met/*
+**/Met_DiD/*
+**/Mic/*
+**/Mic_DiD/*
+**/panels/*
+**/Unuse*
+
+# Ignore environment-specific and temporary files
+.Rhistory
+.vscode/
+*~
+.DS_Store
+
+# Ignore Python cache
+__pycache__/
+*.pyc

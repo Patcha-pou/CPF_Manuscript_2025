@@ -1,0 +1,535 @@
+================================================================================================================
+####Activated QIIME
+================================================================================================================
+source activate qiime2-2022.8
+
+================================================================================================================
+####1.Import, Dumux
+================================================================================================================
+
+qiime tools import --type 'SampleData[PairedEndSequencesWithQuality]' --input-path sequence_data/import_to_qiime --output-path 1.reads
+
+
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences 1.reads.qza --p-front-f CTAGTGCCAGCMGCCGCGGTAA --p-front-r CTAGGACTACHVGGGTWTCTAAT --o-trimmed-sequences 1.1.reads.qza --verbose
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences 1.1.reads.qza --p-front-f ACGTGCCAGCMGCCGCGGTAA --p-front-r ACGGACTACHVGGGTWTCTAAT --o-trimmed-sequences 1.2.reads.qza --verbose
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences 1.2.reads.qza --p-front-f TGTGCCAGCMGCCGCGGTAA --p-front-r TGGACTACHVGGGTWTCTAAT --o-trimmed-sequences 1.3.reads.qza  --verbose
+
+qiime cutadapt trim-paired --i-demultiplexed-sequences 1.3.reads.qza --p-front-f GTGCCAGCMGCCGCGGTAA --p-front-r GGACTACHVGGGTWTCTAAT --o-trimmed-sequences 1.4.reads.qza --verbose
+
+
+#Using DADA2 to analyze quality scores of 10 random samples
+qiime demux summarize --i-data 1.4.reads.qza --o-visualization 1.4.qual_viz
+
+================================================================================================================
+#2. Denoising with DADA2. Using quality score visualizations, you can choose trunc-len-f and trunc-len-r (note: sequences < trunc-len in length are discarded!)
+# The drop-off for the forward reads was not so bad, but there is a significant drop-off in quality for the reverse reads, so let's trim 10bp
+================================================================================================================
+
+qiime dada2 denoise-paired --i-demultiplexed-seqs 1.4.reads.qza --o-table 2.table --o-representative-sequences 2.rep_seqs.qza --o-denoising-stats 2.denoise_stats --p-trunc-len-f 180 --p-trunc-len-r 200 --p-trim-left-f 0 --p-trim-left-r 0 --p-n-threads 5 --p-min-fold-parent-over-abundance 6 --p-min-overlap 12
+
+
+
+qiime feature-table tabulate-seqs --i-data 2.rep_seqs.qza --o-visualization 2.rep_seqs.qzv 
+qiime feature-table summarize --i-table 2.table.qza --o-visualization 2.table_summary.qzv
+
+
+
+================================================================================================================
+####3.Filter seq and feature (If rarefy of raw show the low reads sample, that sample should by drop out)
+================================================================================================================
+
+
+================================================================================================================
+================================================================================================================
+#########Ori Criteria เก็บ OTU ที่มีอย่างน้อย 3 ตัวอย่างที่มี abundance อย่างน้อย 1
+================================================================================================================
+================================================================================================================
+
+mkdir filtered
+
+cd filtered
+mkdir OriCriteria
+cd ..
+
+qiime feature-table filter-features \
+  --i-table 2.table.qza \
+  --p-min-frequency 2 \
+  --o-filtered-table filtered/OriCriteria/3.1.table.qza
+
+
+qiime feature-table filter-features \
+  --i-table filtered/OriCriteria/3.1.table.qza \
+  --p-min-samples 3 \
+  --o-filtered-table filtered/OriCriteria/3.2.table.qza
+
+
+qiime feature-table summarize --i-table filtered/OriCriteria/3.2.table.qza --o-visualization filtered/OriCriteria/3.2.table_summary.qzv
+
+
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data 2.rep_seqs.qza  --i-table filtered/OriCriteria/3.2.table.qza --o-filtered-data filtered/OriCriteria/3.2.rep_seqs.qza
+
+
+================================================================================================================
+####4.To observe filtered data
+================================================================================================================
+
+####Phylogeny of filtered representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/OriCriteria/3.2.rep_seqs.qza --o-alignment filtered/OriCriteria/4.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/OriCriteria/4.1.rep_seqs.qza --o-masked-alignment filtered/OriCriteria/4.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/OriCriteria/4.2.rep_seqs.qza --o-tree filtered/OriCriteria/4.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/OriCriteria/4.2.unrooted_tree.qza --o-rooted-tree filtered/OriCriteria/4.2.rooted_tree
+
+######Alpha rarefraction curve of filtered representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/OriCriteria/3.2.table.qza --p-max-depth 25115 --o-visualization filtered/OriCriteria/4.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/OriCriteria/4.2.rooted_tree.qza
+
+================================================================================================================
+####5.Normalized
+================================================================================================================
+
+qiime feature-table rarefy --i-table filtered/OriCriteria/3.2.table.qza --p-sampling-depth 14000 --o-rarefied-table filtered/OriCriteria/5.table.qza
+qiime feature-table summarize --i-table filtered/OriCriteria/5.table.qza --o-visualization filtered/OriCriteria/5.table_summary
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data filtered/OriCriteria/3.2.rep_seqs.qza --i-table filtered/OriCriteria/5.table.qza --o-filtered-data filtered/OriCriteria/5.rep_seqs.qza
+
+####Phylogeny of Normalized representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/OriCriteria/5.rep_seqs.qza --o-alignment filtered/OriCriteria/5.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/OriCriteria/5.1.rep_seqs.qza --o-masked-alignment filtered/OriCriteria/5.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/OriCriteria/5.2.rep_seqs.qza --o-tree filtered/OriCriteria/5.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/OriCriteria/5.2.unrooted_tree.qza --o-rooted-tree filtered/OriCriteria/5.2.rooted_tree
+
+######Alpha rarefraction curve of Normalized representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/OriCriteria/5.table.qza --p-max-depth 14000  --o-visualization filtered/OriCriteria/5.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/OriCriteria/5.2.rooted_tree.qza
+
+================================================================================================================
+#6.Classify against it with Naive Bayes
+================================================================================================================
+qiime feature-classifier classify-sklearn --i-classifier silva-138-99-515-806-nb-classifier.qza --i-reads filtered/OriCriteria/5.rep_seqs.qza --o-classification filtered/OriCriteria/6.taxonomy 
+
+#Taxa bar plots
+qiime taxa barplot --i-table filtered/OriCriteria/5.table.qza --i-taxonomy filtered/OriCriteria/6.taxonomy.qza --m-metadata-file METADATA.txt --o-visualization filtered/OriCriteria/6.taxa-bar-plots
+
+
+================================================================================================================
+#7.Diversity
+================================================================================================================
+
+qiime diversity core-metrics-phylogenetic --i-phylogeny filtered/OriCriteria/5.2.rooted_tree.qza --i-table filtered/OriCriteria/5.table.qza --p-sampling-depth 14000 --output-dir filtered/OriCriteria/diversity --m-metadata-file METADATA.txt 
+
+qiime diversity alpha-group-significance --i-alpha-diversity filtered/OriCriteria/diversity/shannon_vector.qza --m-metadata-file METADATA.txt  --o-visualization filtered/OriCriteria/diversity/alpha_shannon_significance
+
+
+
+================================================================================================================
+================================================================================================================
+#########First Criteria เก็บ OTU ที่มีอย่างน้อย 9 ตัวอย่างที่มี abundance อย่างน้อย 5% (168225) 
+================================================================================================================
+================================================================================================================
+
+
+cd filtered
+mkdir 1.Criteria
+cd ..
+
+qiime feature-table filter-features \
+  --i-table 2.table.qza \
+  --p-min-frequency 168225 \
+  --o-filtered-table filtered/1.Criteria/3.1.table.qza
+
+
+qiime feature-table filter-features \
+  --i-table filtered/1.Criteria/3.1.table.qza \
+  --p-min-samples 9 \
+  --o-filtered-table filtered/1.Criteria/3.2.table.qza
+
+
+qiime feature-table summarize --i-table filtered/1.Criteria/3.2.table.qza --o-visualization filtered/1.Criteria/3.2.table_summary.qzv
+
+
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data 2.rep_seqs.qza  --i-table filtered/1.Criteria/3.2.table.qza --o-filtered-data filtered/1.Criteria/3.2.rep_seqs.qza
+
+
+================================================================================================================
+####4.To observe filtered data
+================================================================================================================
+
+####Phylogeny of filtered representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/1.Criteria/3.2.rep_seqs.qza --o-alignment filtered/1.Criteria/4.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/1.Criteria/4.1.rep_seqs.qza --o-masked-alignment filtered/1.Criteria/4.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/1.Criteria/4.2.rep_seqs.qza --o-tree filtered/1.Criteria/4.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/1.Criteria/4.2.unrooted_tree.qza --o-rooted-tree filtered/1.Criteria/4.2.rooted_tree
+
+######Alpha rarefraction curve of filtered representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/1.Criteria/3.2.table.qza --p-max-depth 8439 --o-visualization filtered/1.Criteria/4.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/1.Criteria/4.2.rooted_tree.qza
+
+================================================================================================================
+####5.Normalized
+================================================================================================================
+
+qiime feature-table rarefy --i-table filtered/1.Criteria/3.2.table.qza --p-sampling-depth 2000 --o-rarefied-table filtered/1.Criteria/5.table.qza
+qiime feature-table summarize --i-table filtered/1.Criteria/5.table.qza --o-visualization filtered/1.Criteria/5.table_summary
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data filtered/1.Criteria/3.2.rep_seqs.qza --i-table filtered/1.Criteria/5.table.qza --o-filtered-data filtered/1.Criteria/5.rep_seqs.qza
+
+####Phylogeny of Normalized representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/1.Criteria/5.rep_seqs.qza --o-alignment filtered/1.Criteria/5.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/1.Criteria/5.1.rep_seqs.qza --o-masked-alignment filtered/1.Criteria/5.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/1.Criteria/5.2.rep_seqs.qza --o-tree filtered/1.Criteria/5.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/1.Criteria/5.2.unrooted_tree.qza --o-rooted-tree filtered/1.Criteria/5.2.rooted_tree
+
+######Alpha rarefraction curve of Normalized representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/1.Criteria/5.table.qza --p-max-depth 2000  --o-visualization filtered/1.Criteria/5.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/1.Criteria/5.2.rooted_tree.qza
+
+================================================================================================================
+#6.Classify against it with Naive Bayes
+================================================================================================================
+qiime feature-classifier classify-sklearn --i-classifier silva-138-99-515-806-nb-classifier.qza --i-reads filtered/1.Criteria/5.rep_seqs.qza --o-classification filtered/1.Criteria/6.taxonomy 
+
+#Taxa bar plots
+qiime taxa barplot --i-table filtered/1.Criteria/5.table.qza --i-taxonomy filtered/1.Criteria/6.taxonomy.qza --m-metadata-file METADATA.txt --o-visualization filtered/1.Criteria/6.taxa-bar-plots
+
+
+================================================================================================================
+#7.Diversity
+================================================================================================================
+
+qiime diversity core-metrics-phylogenetic --i-phylogeny filtered/1.Criteria/5.2.rooted_tree.qza --i-table filtered/1.Criteria/5.table.qza --p-sampling-depth 2000 --output-dir filtered/1.Criteria/diversity --m-metadata-file METADATA.txt 
+
+qiime diversity alpha-group-significance --i-alpha-diversity filtered/1.Criteria/diversity/shannon_vector.qza --m-metadata-file METADATA.txt  --o-visualization filtered/1.Criteria/diversity/alpha_shannon_significance
+
+
+================================================================================================================
+================================================================================================================
+#########Second Criteria เก็บ OTU ที่มีอย่างน้อย 9 ตัวอย่างที่มี abundance อย่างน้อย 1% (33645) 
+================================================================================================================
+================================================================================================================
+
+
+cd filtered
+mkdir 2.Criteria
+cd ..
+
+qiime feature-table filter-features \
+  --i-table 2.table.qza \
+  --p-min-frequency 33645 \
+  --o-filtered-table filtered/2.Criteria/3.1.table.qza
+
+
+qiime feature-table filter-features \
+  --i-table filtered/2.Criteria/3.1.table.qza \
+  --p-min-samples 9 \
+  --o-filtered-table filtered/2.Criteria/3.2.table.qza
+
+
+qiime feature-table summarize --i-table filtered/2.Criteria/3.2.table.qza --o-visualization filtered/2.Criteria/3.2.table_summary.qzv
+
+
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data 2.rep_seqs.qza  --i-table filtered/2.Criteria/3.2.table.qza --o-filtered-data filtered/2.Criteria/3.2.rep_seqs.qza
+
+
+================================================================================================================
+####4.To observe filtered data
+================================================================================================================
+
+####Phylogeny of filtered representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/2.Criteria/3.2.rep_seqs.qza --o-alignment filtered/2.Criteria/4.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/2.Criteria/4.1.rep_seqs.qza --o-masked-alignment filtered/2.Criteria/4.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/2.Criteria/4.2.rep_seqs.qza --o-tree filtered/2.Criteria/4.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/2.Criteria/4.2.unrooted_tree.qza --o-rooted-tree filtered/2.Criteria/4.2.rooted_tree
+
+######Alpha rarefraction curve of filtered representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/2.Criteria/3.2.table.qza --p-max-depth 17722 --o-visualization filtered/2.Criteria/4.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/2.Criteria/4.2.rooted_tree.qza
+
+================================================================================================================
+####5.Normalized
+================================================================================================================
+
+qiime feature-table rarefy --i-table filtered/2.Criteria/3.2.table.qza --p-sampling-depth 5000 --o-rarefied-table filtered/2.Criteria/5.table.qza
+qiime feature-table summarize --i-table filtered/2.Criteria/5.table.qza --o-visualization filtered/2.Criteria/5.table_summary
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data filtered/2.Criteria/3.2.rep_seqs.qza --i-table filtered/2.Criteria/5.table.qza --o-filtered-data filtered/2.Criteria/5.rep_seqs.qza
+
+####Phylogeny of Normalized representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/2.Criteria/5.rep_seqs.qza --o-alignment filtered/2.Criteria/5.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/2.Criteria/5.1.rep_seqs.qza --o-masked-alignment filtered/2.Criteria/5.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/2.Criteria/5.2.rep_seqs.qza --o-tree filtered/2.Criteria/5.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/2.Criteria/5.2.unrooted_tree.qza --o-rooted-tree filtered/2.Criteria/5.2.rooted_tree
+
+######Alpha rarefraction curve of Normalized representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/2.Criteria/5.table.qza --p-max-depth 5000  --o-visualization filtered/2.Criteria/5.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/2.Criteria/5.2.rooted_tree.qza
+
+================================================================================================================
+#6.Classify against it with Naive Bayes
+================================================================================================================
+qiime feature-classifier classify-sklearn --i-classifier silva-138-99-515-806-nb-classifier.qza --i-reads filtered/2.Criteria/5.rep_seqs.qza --o-classification filtered/2.Criteria/6.taxonomy 
+
+#Taxa bar plots
+qiime taxa barplot --i-table filtered/2.Criteria/5.table.qza --i-taxonomy filtered/2.Criteria/6.taxonomy.qza --m-metadata-file METADATA.txt --o-visualization filtered/2.Criteria/6.taxa-bar-plots
+
+
+================================================================================================================
+#7.Diversity
+================================================================================================================
+
+qiime diversity core-metrics-phylogenetic --i-phylogeny filtered/2.Criteria/5.2.rooted_tree.qza --i-table filtered/2.Criteria/5.table.qza --p-sampling-depth 5000 --output-dir filtered/2.Criteria/diversity --m-metadata-file METADATA.txt 
+
+qiime diversity alpha-group-significance --i-alpha-diversity filtered/2.Criteria/diversity/shannon_vector.qza --m-metadata-file METADATA.txt  --o-visualization filtered/2.Criteria/diversity/alpha_shannon_significance
+
+
+================================================================================================================
+================================================================================================================
+#########Third Criteria เก็บ OTU ที่มีอย่างน้อย 9 ตัวอย่างที่มี abundance อย่างน้อย 0.1% (3365)
+================================================================================================================
+================================================================================================================
+
+
+cd filtered
+mkdir 3.Criteria
+cd ..
+
+qiime feature-table filter-features \
+  --i-table 2.table.qza \
+  --p-min-frequency 3365 \
+  --o-filtered-table filtered/3.Criteria/3.1.table.qza
+
+
+qiime feature-table filter-features \
+  --i-table filtered/3.Criteria/3.1.table.qza \
+  --p-min-samples 9 \
+  --o-filtered-table filtered/3.Criteria/3.2.table.qza
+
+
+qiime feature-table summarize --i-table filtered/3.Criteria/3.2.table.qza --o-visualization filtered/3.Criteria/3.2.table_summary.qzv
+
+
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data 2.rep_seqs.qza  --i-table filtered/3.Criteria/3.2.table.qza --o-filtered-data filtered/3.Criteria/3.2.rep_seqs.qza
+
+
+
+================================================================================================================
+####4.To observe filtered data
+================================================================================================================
+
+####Phylogeny of filtered representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/3.Criteria/3.2.rep_seqs.qza --o-alignment filtered/3.Criteria/4.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/3.Criteria/4.1.rep_seqs.qza --o-masked-alignment filtered/3.Criteria/4.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/3.Criteria/4.2.rep_seqs.qza --o-tree filtered/3.Criteria/4.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/3.Criteria/4.2.unrooted_tree.qza --o-rooted-tree filtered/3.Criteria/4.2.rooted_tree
+
+######Alpha rarefraction curve of filtered representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/3.Criteria/3.2.table.qza --p-max-depth 22771 --o-visualization filtered/3.Criteria/4.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/3.Criteria/4.2.rooted_tree.qza
+
+================================================================================================================
+####5.Normalized
+================================================================================================================
+
+qiime feature-table rarefy --i-table filtered/3.Criteria/3.2.table.qza --p-sampling-depth 10000 --o-rarefied-table filtered/3.Criteria/5.table.qza
+qiime feature-table summarize --i-table filtered/3.Criteria/5.table.qza --o-visualization filtered/3.Criteria/5.table_summary
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data filtered/3.Criteria/3.2.rep_seqs.qza --i-table filtered/3.Criteria/5.table.qza --o-filtered-data filtered/3.Criteria/5.rep_seqs.qza
+
+####Phylogeny of Normalized representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/3.Criteria/5.rep_seqs.qza --o-alignment filtered/3.Criteria/5.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/3.Criteria/5.1.rep_seqs.qza --o-masked-alignment filtered/3.Criteria/5.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/3.Criteria/5.2.rep_seqs.qza --o-tree filtered/3.Criteria/5.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/3.Criteria/5.2.unrooted_tree.qza --o-rooted-tree filtered/3.Criteria/5.2.rooted_tree
+
+######Alpha rarefraction curve of Normalized representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/3.Criteria/5.table.qza --p-max-depth 10000  --o-visualization filtered/3.Criteria/5.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/3.Criteria/5.2.rooted_tree.qza
+
+================================================================================================================
+#6.Classify against it with Naive Bayes
+================================================================================================================
+qiime feature-classifier classify-sklearn --i-classifier silva-138-99-515-806-nb-classifier.qza --i-reads filtered/3.Criteria/5.rep_seqs.qza --o-classification filtered/3.Criteria/6.taxonomy 
+
+#Taxa bar plots
+qiime taxa barplot --i-table filtered/3.Criteria/5.table.qza --i-taxonomy filtered/3.Criteria/6.taxonomy.qza --m-metadata-file METADATA.txt --o-visualization filtered/3.Criteria/6.taxa-bar-plots
+
+
+================================================================================================================
+#7.Diversity
+================================================================================================================
+
+qiime diversity core-metrics-phylogenetic --i-phylogeny filtered/3.Criteria/5.2.rooted_tree.qza --i-table filtered/3.Criteria/5.table.qza --p-sampling-depth 10000 --output-dir filtered/3.Criteria/diversity --m-metadata-file METADATA.txt 
+
+qiime diversity alpha-group-significance --i-alpha-diversity filtered/3.Criteria/diversity/shannon_vector.qza --m-metadata-file METADATA.txt  --o-visualization filtered/3.Criteria/diversity/alpha_shannon_significance
+
+
+================================================================================================================
+================================================================================================================
+#########Forth Criteria เก็บ OTU ที่มีอย่างน้อย 9 ตัวอย่างที่มี abundance อย่างน้อย 0.01% (337) 
+================================================================================================================
+================================================================================================================
+
+
+cd filtered
+mkdir 4.Criteria
+cd ..
+
+qiime feature-table filter-features \
+  --i-table 2.table.qza \
+  --p-min-frequency 337 \
+  --o-filtered-table filtered/4.Criteria/3.1.table.qza
+
+
+qiime feature-table filter-features \
+  --i-table filtered/4.Criteria/3.1.table.qza \
+  --p-min-samples 9 \
+  --o-filtered-table filtered/4.Criteria/3.2.table.qza
+
+
+qiime feature-table summarize --i-table filtered/4.Criteria/3.2.table.qza --o-visualization filtered/4.Criteria/3.2.table_summary.qzv
+
+
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data 2.rep_seqs.qza  --i-table filtered/4.Criteria/3.2.table.qza --o-filtered-data filtered/4.Criteria/3.2.rep_seqs.qza
+
+
+================================================================================================================
+####4.To observe filtered data
+================================================================================================================
+
+####Phylogeny of filtered representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/4.Criteria/3.2.rep_seqs.qza --o-alignment filtered/4.Criteria/4.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/4.Criteria/4.1.rep_seqs.qza --o-masked-alignment filtered/4.Criteria/4.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/4.Criteria/4.2.rep_seqs.qza --o-tree filtered/4.Criteria/4.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/4.Criteria/4.2.unrooted_tree.qza --o-rooted-tree filtered/4.Criteria/4.2.rooted_tree
+
+######Alpha rarefraction curve of filtered representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/4.Criteria/3.2.table.qza --p-max-depth 24092 --o-visualization filtered/4.Criteria/4.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/4.Criteria/4.2.rooted_tree.qza
+
+================================================================================================================
+####5.Normalized
+================================================================================================================
+
+qiime feature-table rarefy --i-table filtered/4.Criteria/3.2.table.qza --p-sampling-depth 10000 --o-rarefied-table filtered/4.Criteria/5.table.qza
+qiime feature-table summarize --i-table filtered/4.Criteria/5.table.qza --o-visualization filtered/4.Criteria/5.table_summary
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data filtered/4.Criteria/3.2.rep_seqs.qza --i-table filtered/4.Criteria/5.table.qza --o-filtered-data filtered/4.Criteria/5.rep_seqs.qza
+
+####Phylogeny of Normalized representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/4.Criteria/5.rep_seqs.qza --o-alignment filtered/4.Criteria/5.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/4.Criteria/5.1.rep_seqs.qza --o-masked-alignment filtered/4.Criteria/5.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/4.Criteria/5.2.rep_seqs.qza --o-tree filtered/4.Criteria/5.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/4.Criteria/5.2.unrooted_tree.qza --o-rooted-tree filtered/4.Criteria/5.2.rooted_tree
+
+######Alpha rarefraction curve of Normalized representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/4.Criteria/5.table.qza --p-max-depth 10000  --o-visualization filtered/4.Criteria/5.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/4.Criteria/5.2.rooted_tree.qza
+
+================================================================================================================
+#6.Classify against it with Naive Bayes
+================================================================================================================
+qiime feature-classifier classify-sklearn --i-classifier silva-138-99-515-806-nb-classifier.qza --i-reads filtered/4.Criteria/5.rep_seqs.qza --o-classification filtered/4.Criteria/6.taxonomy 
+
+#Taxa bar plots
+qiime taxa barplot --i-table filtered/4.Criteria/5.table.qza --i-taxonomy filtered/4.Criteria/6.taxonomy.qza --m-metadata-file METADATA.txt --o-visualization filtered/4.Criteria/6.taxa-bar-plots
+
+
+================================================================================================================
+#7.Diversity
+================================================================================================================
+
+qiime diversity core-metrics-phylogenetic --i-phylogeny filtered/4.Criteria/5.2.rooted_tree.qza --i-table filtered/4.Criteria/5.table.qza --p-sampling-depth 10000 --output-dir filtered/4.Criteria/diversity --m-metadata-file METADATA.txt 
+
+qiime diversity alpha-group-significance --i-alpha-diversity filtered/4.Criteria/diversity/shannon_vector.qza --m-metadata-file METADATA.txt  --o-visualization filtered/4.Criteria/diversity/alpha_shannon_significance
+
+
+
+================================================================================================================
+================================================================================================================
+#########Fifth Criteria เก็บ OTU ที่มีอย่างน้อย 9 ตัวอย่างที่มี abundance อย่างน้อย 0.001% (34) 
+================================================================================================================
+================================================================================================================
+
+
+cd filtered
+mkdir 5.Criteria
+cd ..
+
+qiime feature-table filter-features \
+  --i-table 2.table.qza \
+  --p-min-frequency 34 \
+  --o-filtered-table filtered/5.Criteria/3.1.table.qza
+
+
+qiime feature-table filter-features \
+  --i-table filtered/5.Criteria/3.1.table.qza \
+  --p-min-samples 9 \
+  --o-filtered-table filtered/5.Criteria/3.2.table.qza
+
+
+qiime feature-table summarize --i-table filtered/5.Criteria/3.2.table.qza --o-visualization filtered/5.Criteria/3.2.table_summary.qzv
+
+
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data 2.rep_seqs.qza  --i-table filtered/5.Criteria/3.2.table.qza --o-filtered-data filtered/5.Criteria/3.2.rep_seqs.qza
+
+
+================================================================================================================
+####4.To observe filtered data
+================================================================================================================
+
+####Phylogeny of filtered representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/5.Criteria/3.2.rep_seqs.qza --o-alignment filtered/5.Criteria/4.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/5.Criteria/4.1.rep_seqs.qza --o-masked-alignment filtered/5.Criteria/4.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/5.Criteria/4.2.rep_seqs.qza --o-tree filtered/5.Criteria/4.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/5.Criteria/4.2.unrooted_tree.qza --o-rooted-tree filtered/5.Criteria/4.2.rooted_tree
+
+######Alpha rarefraction curve of filtered representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/5.Criteria/3.2.table.qza --p-max-depth 24101 --o-visualization filtered/5.Criteria/4.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/5.Criteria/4.2.rooted_tree.qza
+
+================================================================================================================
+####5.Normalized
+================================================================================================================
+
+qiime feature-table rarefy --i-table filtered/5.Criteria/3.2.table.qza --p-sampling-depth 10000 --o-rarefied-table filtered/5.Criteria/5.table.qza
+qiime feature-table summarize --i-table filtered/5.Criteria/5.table.qza --o-visualization filtered/5.Criteria/5.table_summary
+
+####Use Filtered tabel to clean rep-seq
+qiime feature-table filter-seqs --i-data filtered/5.Criteria/3.2.rep_seqs.qza --i-table filtered/5.Criteria/5.table.qza --o-filtered-data filtered/5.Criteria/5.rep_seqs.qza
+
+####Phylogeny of Normalized representative_sequences and filterd feature table
+qiime alignment mafft --i-sequences filtered/5.Criteria/5.rep_seqs.qza --o-alignment filtered/5.Criteria/5.1.rep_seqs.qza
+qiime alignment mask --i-alignment filtered/5.Criteria/5.1.rep_seqs.qza --o-masked-alignment filtered/5.Criteria/5.2.rep_seqs.qza
+qiime phylogeny fasttree --i-alignment filtered/5.Criteria/5.2.rep_seqs.qza --o-tree filtered/5.Criteria/5.2.unrooted_tree
+qiime phylogeny midpoint-root --i-tree filtered/5.Criteria/5.2.unrooted_tree.qza --o-rooted-tree filtered/5.Criteria/5.2.rooted_tree
+
+######Alpha rarefraction curve of Normalized representative_sequences and filtered table
+qiime diversity alpha-rarefaction --i-table filtered/5.Criteria/5.table.qza --p-max-depth 10000  --o-visualization filtered/5.Criteria/5.2.alpha_rarefaction.qzv --m-metadata-file METADATA.txt --i-phylogeny filtered/5.Criteria/5.2.rooted_tree.qza
+
+================================================================================================================
+#6.Classify against it with Naive Bayes
+================================================================================================================
+qiime feature-classifier classify-sklearn --i-classifier silva-138-99-515-806-nb-classifier.qza --i-reads filtered/5.Criteria/5.rep_seqs.qza --o-classification filtered/5.Criteria/6.taxonomy 
+
+#Taxa bar plots
+qiime taxa barplot --i-table filtered/5.Criteria/5.table.qza --i-taxonomy filtered/5.Criteria/6.taxonomy.qza --m-metadata-file METADATA.txt --o-visualization filtered/5.Criteria/6.taxa-bar-plots
+
+
+================================================================================================================
+#7.Diversity
+================================================================================================================
+
+qiime diversity core-metrics-phylogenetic --i-phylogeny filtered/5.Criteria/5.2.rooted_tree.qza --i-table filtered/5.Criteria/5.table.qza --p-sampling-depth 10000 --output-dir filtered/5.Criteria/diversity --m-metadata-file METADATA.txt 
+
+qiime diversity alpha-group-significance --i-alpha-diversity filtered/5.Criteria/diversity/shannon_vector.qza --m-metadata-file METADATA.txt  --o-visualization filtered/5.Criteria/diversity/alpha_shannon_significance
+
+
+
