@@ -21,6 +21,7 @@ TARGET_GENERA <- c("Clostridium_sensu_stricto_1",
                    "Lachnospiraceae_UCG-010",
                    "Roseburia")
 TREAT_LEVELS  <- c("Asiatica", "Fiber_added", "Placebo")
+TREAT_LABELS  <- c("Gotu kola juice-only\n(GKJ)", "Fiber-enriched\nGotu kola juice\n(F-GKJ)", "Placebo\n(CON)")
 
 # --- 2. Genus counts -> long format -------------------------------------------
 mic_genus <- microbe_df %>%
@@ -43,7 +44,7 @@ plot_df <- mic_genus %>%
              by = "SampleID") %>%
   mutate(
     Genus      = factor(Genus, levels = TARGET_GENERA),
-    Treatments = factor(Treatments, levels = TREAT_LEVELS),
+    Treatments = factor(Treatments, levels = TREAT_LEVELS, labels = TREAT_LABELS),
     Weeks      = factor(as.character(Weeks), levels = c("0", "2", "4"))
   )
 

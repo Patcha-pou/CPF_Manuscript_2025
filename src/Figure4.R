@@ -19,11 +19,11 @@ FS_M <- 6
 FS_L <- 6.5
 FS_T <- 8
 gp_txt <- function(size, face = "plain", ...) gpar(fontsize = size, fontface = face, fontfamily = FONT, ...)
-GROUP_LV <- c("Placebo", "C. asiatica", "Fiber-enriched C. asiatica")
+GROUP_LV <- c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)")
 PAL <- setNames(c("#999999", "#e6c60d", "#5ca08e"), GROUP_LV)
-LEG_LAB <- c("Placebo" = "Placebo",
-             "C. asiatica" = expression(italic("C. asiatica")),
-             "Fiber-enriched C. asiatica" = expression("Fiber-enriched"~italic("C. asiatica")))
+LEG_LAB <- c("Placebo (CON)" = "Placebo (CON)",
+             "Gotu kola juice-only (GKJ)" = "Gotu kola juice-only (GKJ)",
+             "Fiber-enriched Gotu kola juice (F-GKJ)" = "Fiber-enriched Gotu kola\njuice (F-GKJ)")
 theme_fig <- theme_bw(base_size = FS_S, base_family = FONT) +
   theme(axis.title = element_text(size = FS_M, face = "bold"),
         axis.text = element_text(size = FS_S, colour = "black"),
@@ -34,14 +34,14 @@ theme_fig <- theme_bw(base_size = FS_S, base_family = FONT) +
 MET_MIC  <- file.path(INPUT_DIR, "inputMetMic.xlsx")
 METADATA <- read_excel(MET_MIC, sheet = "METADATA") %>%
   mutate(Treatments = factor(case_when(
-    grepl("Fiber", Treatments, ignore.case = TRUE) ~ "Fiber-enriched C. asiatica",
-    grepl("Asiatica", Treatments, ignore.case = TRUE) ~ "C. asiatica",
-    TRUE ~ "Placebo"), levels = GROUP_LV))
+    grepl("Fiber", Treatments, ignore.case = TRUE) ~ "Fiber-enriched Gotu kola juice (F-GKJ)",
+    grepl("Asiatica", Treatments, ignore.case = TRUE) ~ "Gotu kola juice-only (GKJ)",
+    TRUE ~ "Placebo (CON)"), levels = GROUP_LV))
 Met <- read_excel(MET_MIC, sheet = "Met")
 
 # --- 2. Panel A: class totals over weeks (column indexes as in Figure4A.R) ---
-FACET_LAB <- c("Placebo" = "Placebo", "C. asiatica" = "*C. asiatica*",
-               "Fiber-enriched C. asiatica" = "Fiber-<br>enriched<br>*C. asiatica*")
+FACET_LAB <- c("Placebo (CON)" = "CON", "Gotu kola juice-only (GKJ)" = "GKJ",
+               "Fiber-enriched Gotu kola juice (F-GKJ)" = "F-GKJ")
 plot_total <- function(cols_idx, title_text) {
   d <- Met %>%
     mutate(Total_Val = rowSums(select(., all_of(colnames(Met)[cols_idx])), na.rm = TRUE)) %>%
@@ -60,7 +60,7 @@ plot_total <- function(cols_idx, title_text) {
           panel.spacing = unit(0.8, "mm"),
           strip.background = element_rect(fill = "grey90", colour = "black", linewidth = 0.25),
           strip.text = element_markdown(face = "bold", size = FS_S, halign = 0.5,
-                                        lineheight = 0.9, margin = margin(0.5, 0.5, 0.5, 0.5)),
+                                        lineheight = 0.9, margin = margin(1, 0.5, 1, 0.5)),
           plot.subtitle = element_text(hjust = 0.5, size = FS_M, face = "bold",
                                        margin = margin(0, 0, 0.5, 0)),
           axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
@@ -144,6 +144,8 @@ block <- function(idx, lwd) anno_block(
     grid.text(nm, rot = 90, gp = gp_txt(FS_M, "bold"))
   }, width = unit(3.5, "mm"))
 ROW_H <- 2.5
+HEAD_LAB <- c("Placebo (CON)" = "CON", "Gotu kola juice-only (GKJ)" = "GKJ",
+              "Fiber-enriched Gotu kola juice (F-GKJ)" = "F-GKJ")
 ht <- Heatmap(mat_fc, name = "log2FC", col = col_fun, show_heatmap_legend = FALSE,
               cluster_rows = FALSE, cluster_columns = FALSE,
               border = TRUE, border_gp = gpar(lwd = 0.5),
@@ -168,14 +170,7 @@ ht <- Heatmap(mat_fc, name = "log2FC", col = col_fun, show_heatmap_legend = FALS
                   align_to = setNames(list(1:2, 3:4, 5:6), GROUP_LV),
                   panel_fun = function(index, nm) {
                     grid.rect(gp = gpar(fill = "white", col = "black", lwd = 0.5))
-                    if (nm == "Placebo") {
-                      grid.text("Placebo", gp = gp_txt(FS_S, "bold"))
-                    } else if (nm == "C. asiatica") {
-                      grid.text("C. asiatica", gp = gp_txt(FS_S, "bold.italic"))
-                    } else {
-                      grid.text("Fiber-enriched", y = unit(0.7, "npc"), gp = gp_txt(FS_S, "bold"))
-                      grid.text("C. asiatica", y = unit(0.28, "npc"), gp = gp_txt(FS_S, "bold.italic"))
-                    }
+                    grid.text(HEAD_LAB[[nm]], gp = gp_txt(FS_S, "bold"))
                   }, height = unit(5, "mm")),
                 show_annotation_name = FALSE))
 
@@ -230,7 +225,8 @@ get_legend_C <- function() {
   g <- ggplotGrob(pC$SCFAs + theme(legend.position = "bottom",
                                    legend.text = element_text(size = FS_S),
                                    legend.key.width = unit(3, "mm"),
-                                   legend.key.height = unit(2, "mm")))
+                                   legend.key.height = unit(2, "mm")) +
+                    guides(colour = guide_legend(ncol = 1)))
   idx <- grep("guide-box", g$layout$name)
   Filter(function(x) !inherits(x, "zeroGrob"), g$grobs[idx])[[1]]
 }
@@ -283,7 +279,7 @@ draw_page <- function() {
                       bottom = loc_in(unit(0, "npc"), unit(0, "npc") + unit(3, "mm")))
     upViewport()
   }
-  pushViewport(vp_mm(X_C[1], 125.5, diff(X_C), 4.5)); grid.draw(get_legend_C()); upViewport()
+  pushViewport(vp_mm(X_C[1] + diff(X_C) * 0.4, 108, diff(X_C) * 0.6, 14)); grid.draw(get_legend_C()); upViewport()
 
   for (k in names(ctr)) for (e in c("top", "bottom"))
     grid.lines(unit(c(ctr[[k]][e, "x"], tgt[[k]][e, "x"]), "inches"),

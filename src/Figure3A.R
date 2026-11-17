@@ -115,6 +115,8 @@ lgd_asso = Legend(col_fun = col_fun, title = "log2 fold change (vs W0)", at = c(
                   labels_gp = gpar(fontsize = 7, fontfamily = FONT))
 
 # --- 7. Plot Object Definition ---
+HEAD_LAB <- c("Placebo (CON)" = "CON", "Gotu kola juice-only (GKJ)" = "GKJ",
+              "Fiber-enriched Gotu kola juice (F-GKJ)" = "F-GKJ")
 ht <- Heatmap(final_asso, 
               name = "Association", 
               col = col_fun, 
@@ -128,8 +130,8 @@ ht <- Heatmap(final_asso,
               cluster_columns = FALSE,
               border = TRUE,
               
-              column_split = factor(rep(c("Placebo", "C. asiatica", "Fiber-added"), each = 2),
-                                    levels = c("Placebo", "C. asiatica", "Fiber-added")),
+              column_split = factor(rep(c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)"), each = 2),
+                                    levels = c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)")),
               column_labels = rep(c("W2", "W4"), 3),
               column_names_rot = 0, 
               column_names_gp = gpar(fontsize = 7, fontfamily = FONT),
@@ -149,17 +151,10 @@ ht <- Heatmap(final_asso,
               
               top_annotation = HeatmapAnnotation(
                 title = anno_block(
-                  align_to = list("Placebo" = 1:2, "C. asiatica" = 3:4, "Fiber-added" = 5:6),
+                  align_to = list("Placebo (CON)" = 1:2, "Gotu kola juice-only (GKJ)" = 3:4, "Fiber-enriched Gotu kola juice (F-GKJ)" = 5:6),
                   panel_fun = function(index, nm) {
                     grid.rect(gp = gpar(fill = "white", col = "black", lwd = 0.5))
-                    if(nm == "Placebo") {
-                      grid.text("Placebo", gp = gpar(fontsize = 7, fontface = "bold", fontfamily = FONT))
-                    } else if(nm == "C. asiatica") {
-                      grid.text(expression(bold(italic("C. asiatica"))), gp = gpar(fontsize = 7, fontfamily = FONT))
-                    } else {
-                      grid.text("Fiber-enriched", y = unit(0.72, "npc"), gp = gpar(fontsize = 7, fontface = "bold", fontfamily = FONT))
-                      grid.text(expression(bold(italic("C. asiatica"))), y = unit(0.28, "npc"), gp = gpar(fontsize = 7, fontfamily = FONT))
-                    }
+                    grid.text(HEAD_LAB[[nm]], gp = gpar(fontsize = 7, fontface = "bold", fontfamily = FONT, lineheight = 0.9))
                     
                   }, height = unit(6, "mm")
                 ),

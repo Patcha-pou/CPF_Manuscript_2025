@@ -14,8 +14,8 @@ if (!dir.exists(RESULT_DIR)) dir.create(RESULT_DIR, recursive = TRUE)
 
 FONT   <- "Arial"
 gp_txt <- function(size, face = "plain", ...) gpar(fontsize = size, fontface = face, fontfamily = FONT, ...)
-PAL <- c("Placebo" = "#999999", "C. asiatica" = "#e6c60d",
-         "Fiber-enriched C. asiatica" = "#5ca08e")
+PAL <- c("Placebo (CON)" = "#999999", "Gotu kola juice-only (GKJ)" = "#e6c60d",
+         "Fiber-enriched Gotu kola juice (F-GKJ)" = "#5ca08e")
 
 # --- 2. Panel A: within-arm MaAsLin2 heatmap ---------------------------------
 TAXA <- read_excel(file.path(INPUT_DIR, "Downstream_analysis.xlsx"),
@@ -70,7 +70,9 @@ lgd <- Legend(col_fun = col_fun, title = "log2 fold change\n(vs W0)",
               title_position = "leftcenter",
               title_gp = gp_txt(8, "bold"), labels_gp = gp_txt(7))
 
-ARM_LAB <- c("Placebo", "C. asiatica", "Fiber-enriched C. asiatica")
+ARM_LAB <- c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)")
+HEAD_LAB <- c("Placebo (CON)" = "CON", "Gotu kola juice-only (GKJ)" = "GKJ",
+              "Fiber-enriched Gotu kola juice (F-GKJ)" = "F-GKJ")
 ht <- Heatmap(mat_fc, name = "log2FC", col = col_fun, show_heatmap_legend = FALSE,
               cluster_rows = row_clus, show_row_dend = TRUE, row_dend_side = "left",
               row_dend_width = unit(8, "mm"),
@@ -93,18 +95,11 @@ ht <- Heatmap(mat_fc, name = "log2FC", col = col_fun, show_heatmap_legend = FALS
                 show_annotation_name = FALSE),
               top_annotation = HeatmapAnnotation(
                 arm = anno_block(
-                  align_to = list("Placebo" = 1:2, "C. asiatica" = 3:4,
-                                  "Fiber-enriched C. asiatica" = 5:6),
+                  align_to = list("Placebo (CON)" = 1:2, "Gotu kola juice-only (GKJ)" = 3:4,
+                                  "Fiber-enriched Gotu kola juice (F-GKJ)" = 5:6),
                   panel_fun = function(index, nm) {
                     grid.rect(gp = gpar(fill = "white", col = "black"))
-                    if (nm == "Placebo") {
-                      grid.text("Placebo", gp = gp_txt(7, "bold"))
-                    } else if (nm == "C. asiatica") {
-                      grid.text("C. asiatica", gp = gp_txt(7, "bold.italic"))
-                    } else {
-                      grid.text("Fiber-enriched", y = unit(0.68, "npc"), gp = gp_txt(7, "bold"))
-                      grid.text("C. asiatica", y = unit(0.3, "npc"), gp = gp_txt(7, "bold.italic"))
-                    }
+                    grid.text(HEAD_LAB[[nm]], gp = gp_txt(7, "bold"))
                   }, height = unit(7, "mm")),
                 show_annotation_name = FALSE))
 n_row  <- nrow(mat_fc)
@@ -131,9 +126,9 @@ draw_groups <- function() {
 MET_MIC  <- file.path(INPUT_DIR, "inputMetMic.xlsx")
 METADATA <- read_excel(MET_MIC, sheet = "METADATA") %>%
   mutate(Treatments = factor(case_when(
-    grepl("Fiber", Treatments, ignore.case = TRUE) ~ "Fiber-enriched C. asiatica",
-    grepl("Asiatica", Treatments, ignore.case = TRUE) ~ "C. asiatica",
-    TRUE ~ "Placebo"), levels = names(PAL)))
+    grepl("Fiber", Treatments, ignore.case = TRUE) ~ "Fiber-enriched Gotu kola juice (F-GKJ)",
+    grepl("Asiatica", Treatments, ignore.case = TRUE) ~ "Gotu kola juice-only (GKJ)",
+    TRUE ~ "Placebo (CON)"), levels = names(PAL)))
 Mic <- read_excel(MET_MIC, sheet = "Mic")
 mic <- Mic %>% select(-ID) %>% as.data.frame()
 mic[] <- lapply(mic, function(x) as.numeric(as.character(x)))
@@ -173,9 +168,9 @@ pB <- setNames(lapply(seq_along(TARGET), function(k) plot_one(TARGET[k], k == le
 get_legend_B <- function() {
   g <- ggplotGrob(ggplot(dB, aes(Weeks, Value, colour = Treatments)) + geom_line() +
                     scale_colour_manual(values = PAL, labels = c(
-                      "Placebo" = "Placebo",
-                      "C. asiatica" = expression(italic("C. asiatica")),
-                      "Fiber-enriched C. asiatica" = expression("Fiber-enriched"~italic("C. asiatica")))) +
+                      "Placebo (CON)" = "Placebo (CON)",
+                      "Gotu kola juice-only (GKJ)" = "Gotu kola juice-only (GKJ)",
+                      "Fiber-enriched Gotu kola juice (F-GKJ)" = "Fiber-enriched Gotu kola\njuice (F-GKJ)")) +
                     guides(colour = guide_legend(ncol = 1)) +
                     theme_bw(base_size = 7, base_family = FONT) +
                     theme(legend.title = element_blank(), legend.text = element_text(size = 7),

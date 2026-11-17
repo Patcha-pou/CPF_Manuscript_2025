@@ -19,13 +19,13 @@ if(!dir.exists(RESULT_DIR)) dir.create(RESULT_DIR, recursive = TRUE)
 # --- 3. Load & Prep Data ---
 ps_rare      <- readRDS(INPUT_RDS_RARE)
 
-group_map <- c("Placebo" = "Placebo", 
-               "Asiatica" = "C. asiatica", 
-               "Fiber_added" = "fiber-enriched C. asiatica")
+group_map <- c("Placebo" = "Placebo (CON)", 
+               "Asiatica" = "Gotu kola juice-only (GKJ)", 
+               "Fiber_added" = "Fiber-enriched Gotu kola juice (F-GKJ)")
 
-color_palette <- c("Placebo" = "#999999", 
-                   "C. asiatica" = "#e6c60d", 
-                   "fiber-enriched C. asiatica" = "#5ca08e")
+color_palette <- c("Placebo (CON)" = "#999999", 
+                   "Gotu kola juice-only (GKJ)" = "#e6c60d", 
+                   "Fiber-enriched Gotu kola juice (F-GKJ)" = "#5ca08e")
 
 tw_order <- c(
   "Placebo_W0", "Placebo_W2", "Placebo_W4",
@@ -37,7 +37,8 @@ process_ps_data <- function(ps) {
   sd <- data.frame(sample_data(ps))
   sd$Treatments <- factor(group_map[as.character(sd$Treatments)], levels = names(color_palette))
   sd$Weeks <- factor(as.character(sd$Weeks), levels = c("W0", "W2", "W4"))
-  sd$Treatments_Weeks <- factor(as.character(sd$Treatments_Weeks), levels = tw_order)
+  sd$Treatments_Weeks <- factor(as.character(sd$Treatments_Weeks), levels = tw_order,
+                                labels = paste0(rep(c("CON", "GKJ", "F-GKJ"), each = 3), "_", c("W0", "W2", "W4")))
   sample_data(ps) <- sample_data(sd)
   return(ps)
 }
@@ -45,9 +46,9 @@ process_ps_data <- function(ps) {
 ps_rare <- process_ps_data(ps_rare)
 
 italic_labels <- c(
-  "Placebo" = "Placebo",
-  "C. asiatica" = expression(italic("C. asiatica")),
-  "fiber-enriched C. asiatica" = expression(paste("fiber-enriched ", italic("C. asiatica")))
+  "Placebo (CON)" = "Placebo (CON)",
+  "Gotu kola juice-only (GKJ)" = "Gotu kola juice-only (GKJ)",
+  "Fiber-enriched Gotu kola juice (F-GKJ)" = "Fiber-enriched Gotu kola juice (F-GKJ)"
 )
 
 # --- 4. Alpha Diversity Calculation & Table S2 Export ---
@@ -87,8 +88,8 @@ fit_did <- function(d, ref) {
 }
 alpha_did <- alpha_long %>%
   group_by(Measure) %>%
-  group_modify(~ bind_rows(fit_did(.x, "Placebo"),
-                           fit_did(.x, "C. asiatica") %>% filter(grepl("^fiber-enriched", Contrast)))) %>%
+  group_modify(~ bind_rows(fit_did(.x, "Placebo (CON)"),
+                           fit_did(.x, "Gotu kola juice-only (GKJ)") %>% filter(grepl("^Fiber-enriched", Contrast)))) %>%
   ungroup() %>%
   group_by(Measure) %>% mutate(q_value = p.adjust(p_value, method = "BH")) %>% ungroup() %>%
   mutate(N_participants = n_distinct(alpha_long$Subject)) %>%

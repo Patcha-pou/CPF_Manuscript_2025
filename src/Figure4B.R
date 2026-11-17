@@ -34,7 +34,7 @@ pval_total <- rbind(Placebo_pval, Asiatica_pval, Fiber_added_pval)
 Change_feature_name <- data.frame(
   feature = c("total.Lipid", "ω6.ω3.ratio", "CE.20.5.", "MUFA.SFA.ratio", "PUFA.SFA.ratio", "CE.16.0.", 
               "CE.20.4.", "CE.17.0.", "CE.18.0.", "CE.20.0.", "CE.20.2.", "CE.18.1.", "Acetic.acid", 
-              "Butanoic.acid", "total.CE", "CE.18.2.", "Pentanoic.acid", "CE.16.1.", "X2.Methylhexanoic.acid", 
+              "Butanoic.acid", "total.CE", "CE.18.2.", "Propionic.acid", "CE.16.1.", "X2.Methylhexanoic.acid",
               "CE.15.0.", "X2.Methypropionic.acid", "X3.Methylbutanoic.acid", "X2.Methylbutanoic.acid",
               "p.Cresolsulfate","Phenysulfate","Indoxyl.sulfate","X2.Methoxyphenylsulfate",
               "Hippuric.acid","Cinnamoylglycine"," m.Hydroxyhippuric.acid",
@@ -43,7 +43,7 @@ Change_feature_name <- data.frame(
                   "CE(20:4)", "CE(17:0)", "CE(18:0)", "CE(20:0)", "CE(20:2)", "CE(18:1)", "Acetic acid", 
                   "Butanoic acid", "Total CE", "CE(18:2)", "Propionic acid", "CE(16:1)", "2-Methylhexanoic acid", 
                   "CE(15:0)", "2-Methylpropionic acid", "3-Methylbutanoic acid", "2-Methylbutanoic acid",
-                  "p-Cresolsulfate","Phenysulfate","Indoxyl sulfate","2-Methoxyphenylsulfate",
+                  "p-Cresyl sulfate","Phenyl sulfate","Indoxyl sulfate","2-Methoxyphenylsulfate",
                   "Hippuric acid","Cinnamoylglycine", " m-Hydroxyhippuric acid",
                   "Phenylacetyl-L-glutamine","Trimethylamine N-oxide","Dimethylglycine")
 )
@@ -55,9 +55,9 @@ pval_total <- pval_total %>%
 # --- 4. Custom Order ---
 custom_order <- c(
   "Acetic acid", "Propionic acid", "2-Methylpropionic acid", "Butanoic acid", "3-Methylbutanoic acid", "2-Methylbutanoic acid", "2-Methylhexanoic acid", 
-  "Total CE", "Cholesterol", "CE(15:0)", "CE(16:0)", "CE(16:1)", "CE(17:0)", "CE(18:0)", "CE(18:1)", "CE(18:2)", "CE(20:0)", "CE(20:2)", "CE(20:4)", "CE(20:5)", 
-  "Total Lipid", "SFA", "MUFA", "PUFA", "MUFA/SFA ratio", "PUFA/SFA ratio", "omega6/omega3 ratio", 
-  "p-Cresolsulfate","Phenysulfate","Indoxyl sulfate","2-Methoxyphenylsulfate","Hippuric acid","Cinnamoylglycine", "Phenylacetyl-L-glutamine","Trimethylamine N-oxide","Dimethylglycine"
+  "Cholesterol", "CE(15:0)", "CE(16:0)", "CE(16:1)", "CE(17:0)", "CE(18:0)", "CE(18:1)", "CE(18:2)", "CE(20:0)", "CE(20:2)", "CE(20:4)", "CE(20:5)", 
+  "SFA", "MUFA", "PUFA", "MUFA/SFA ratio", "PUFA/SFA ratio", "omega6/omega3 ratio", 
+  "p-Cresyl sulfate","Phenyl sulfate","Indoxyl sulfate","2-Methoxyphenylsulfate","Hippuric acid","Cinnamoylglycine", "Phenylacetyl-L-glutamine","Trimethylamine N-oxide","Dimethylglycine"
 )
 
 # --- 5. Matrix Construction ---
@@ -93,17 +93,17 @@ if (length(missing_feat) > 0)
 
 # --- 6. Grouping Logic ---
 n_scfa <- 7
-n_ce   <- 13
-n_fa   <- 7
+n_ce   <- 12
+n_fa   <- 6
 n_ut   <- 9
 total_rows <- nrow(matrix_asso)
 
-minor_split <- factor(c(rep("SCFAs", n_scfa), rep("CEs", n_ce), rep("FAs", n_fa), rep("UTs", n_ut)), 
-                      levels = c("SCFAs", "CEs", "FAs", "UTs"))
+minor_split <- factor(c(rep("SCFAs", n_scfa), rep("Cholesterol and CEs", n_ce), rep("FAs", n_fa), rep("UTs", n_ut)),
+                      levels = c("SCFAs", "Cholesterol and CEs", "FAs", "UTs"))
 
 highlight_features <- c(
   "2-Methylhexanoic acid", "2-Methylpropionic acid", "3-Methylbutanoic acid", 
-  "2-Methylbutanoic acid", "Cholesterol", "Total Lipid", "SFA", "MUFA", 
+  "2-Methylbutanoic acid", "Cholesterol", "SFA", "MUFA", 
   "PUFA", "MUFA/SFA ratio", "PUFA/SFA ratio", "omega6/omega3 ratio", "Dimethylglycine"
 )
 
@@ -120,6 +120,8 @@ lgd_asso = Legend(col_fun = col_fun,
 
 # --- 8. Final Plotting ---
 
+HEAD_LAB <- c("Placebo (CON)" = "CON", "Gotu kola juice-only (GKJ)" = "GKJ",
+              "Fiber-enriched Gotu kola juice (F-GKJ)" = "F-GKJ")
 ht <- Heatmap(matrix_asso,
               name = "Association",
               col = col_fun,
@@ -130,8 +132,8 @@ ht <- Heatmap(matrix_asso,
               row_gap = unit(1.2, "mm"),
               border = TRUE,
               
-              column_split = factor(rep(c("Placebo", "C. asiatica", "Fiber-enriched C. asiatica"), each = 2),
-                                    levels = c("Placebo", "C. asiatica", "Fiber-enriched C. asiatica")),
+              column_split = factor(rep(c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)"), each = 2),
+                                    levels = c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)")),
               column_labels = rep(c("W2", "W4"), 3),
               column_names_rot = 0,
               column_names_gp = gpar(fontsize = 7, fontfamily = FONT),
@@ -166,7 +168,7 @@ ht <- Heatmap(matrix_asso,
                   }, width = unit(3.5, "mm")
                 ),
                 Minor = anno_block(
-                  align_to = list("SCFAs" = 1:n_scfa, "CEs" = (n_scfa + 1):(n_scfa + n_ce),
+                  align_to = list("SCFAs" = 1:n_scfa, "Cholesterol and CEs" = (n_scfa + 1):(n_scfa + n_ce),
                                   "FAs" = (n_scfa + n_ce + 1):(n_scfa + n_ce + n_fa),
                                   "UTs" = (n_scfa + n_ce + n_fa + 1):total_rows),
                   panel_fun = function(index, nm) {
@@ -178,19 +180,11 @@ ht <- Heatmap(matrix_asso,
               
               top_annotation = HeatmapAnnotation(
                 title = anno_block(
-                  align_to = list("Placebo" = 1:2, "C. asiatica" = 3:4, "Fiber-enriched C. asiatica" = 5:6),
+                  align_to = list("Placebo (CON)" = 1:2, "Gotu kola juice-only (GKJ)" = 3:4, "Fiber-enriched Gotu kola juice (F-GKJ)" = 5:6),
                   panel_fun = function(index, nm) {
                     grid.rect(gp = gpar(fill = "white", col = "black", lwd = 0.5))
-                    gp <- gpar(fontsize = 7, fontface = "bold", fontfamily = FONT)
-                    if(nm == "Placebo") {
-                      grid.text("Placebo", gp = gp)
-                    } else if(nm == "C. asiatica") {
-                      grid.text(expression(bold(italic("C. asiatica"))), gp = gp)
-                    } else {
-                      grid.text("Fiber-", y = unit(0.8, "npc"), gp = gp)
-                      grid.text("enriched", y = unit(0.5, "npc"), gp = gp)
-                      grid.text(expression(bold(italic("C. asiatica"))), y = unit(0.2, "npc"), gp = gp)
-                    }
+                    gp <- gpar(fontsize = 7, fontface = "bold", fontfamily = FONT, lineheight = 0.9)
+                    grid.text(HEAD_LAB[[nm]], gp = gp)
                   }, height = unit(9, "mm")
                 )
               )

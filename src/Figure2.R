@@ -16,13 +16,13 @@ if (!dir.exists(RESULT_DIR)) dir.create(RESULT_DIR, recursive = TRUE)
 # 1. SETUP & UTILITIES
 # ==========================================
 
-group_map <- c("Control" = "Placebo", 
-               "Asiatica" = "C. asiatica", 
-               "Fiber added" = "fiber-enriched C. asiatica")
+group_map <- c("Control" = "Placebo (CON)", 
+               "Asiatica" = "Gotu kola juice-only (GKJ)", 
+               "Fiber added" = "Fiber-enriched Gotu kola juice (F-GKJ)")
 
-color_palette <- c("Placebo" = "#999999", 
-                   "C. asiatica" = "#e6c60d", 
-                   "fiber-enriched C. asiatica" = "#5ca08e")
+color_palette <- c("Placebo (CON)" = "#999999", 
+                   "Gotu kola juice-only (GKJ)" = "#e6c60d", 
+                   "Fiber-enriched Gotu kola juice (F-GKJ)" = "#5ca08e")
 
 FONT <- "Arial"
 theme_fig <- theme_bw(base_size = 7, base_family = FONT) +
@@ -93,9 +93,9 @@ diet_fig <- ggplot(diet_long, aes(x = Week, y = Conc., fill = Group)) +
   facet_wrap(~Parameter_label, ncol = 6, scales = "free_y") +
   scale_fill_manual(
     values = color_palette,
-    labels = c("Placebo", 
-               expression(italic("C. asiatica")), 
-               expression(paste("fiber-enriched ", italic("C. asiatica"))))
+    labels = c("Placebo (CON)", 
+               "Gotu kola juice-only (GKJ)", 
+               "Fiber-enriched Gotu kola juice (F-GKJ)")
   ) +
   theme_fig +
   labs(title = "Diet over weeks by treatment group", y = "Amount Intake", x = "Week", fill = "Treatments")
@@ -133,9 +133,9 @@ blood_fig <- ggplot(blood_long, aes(x = Week, y = Conc., fill = Group)) +
   facet_wrap(~Parameter_label, ncol = 5, scales = "free_y") +
   scale_fill_manual(
     values = color_palette,
-    labels = c("Placebo", 
-               expression(italic("C. asiatica")), 
-               expression(paste("fiber-enriched ", italic("C. asiatica"))))
+    labels = c("Placebo (CON)", 
+               "Gotu kola juice-only (GKJ)", 
+               "Fiber-enriched Gotu kola juice (F-GKJ)")
   ) +
   theme_fig +
   labs(title = "Blood chemistry over weeks by treatment group", y = "Conc.", x = "Week", fill = "Treatments")

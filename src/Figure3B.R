@@ -18,10 +18,10 @@ Mic      <- read_excel(MET_MIC, sheet = "Mic")
 
 METADATA <- METADATA %>%
   mutate(Treatments = factor(case_when(
-    grepl("Fiber", Treatments, ignore.case = TRUE) ~ "Fiber-enriched C. asiatica",
-    grepl("Asiatica", Treatments, ignore.case = TRUE) ~ "C. asiatica",
-    TRUE ~ "Placebo"
-  ), levels = c("Placebo", "C. asiatica", "Fiber-enriched C. asiatica")))
+    grepl("Fiber", Treatments, ignore.case = TRUE) ~ "Fiber-enriched Gotu kola juice (F-GKJ)",
+    grepl("Asiatica", Treatments, ignore.case = TRUE) ~ "Gotu kola juice-only (GKJ)",
+    TRUE ~ "Placebo (CON)"
+  ), levels = c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)")))
 
 # ==========================================
 # 2. IMPUTATION (missForest)
@@ -56,9 +56,9 @@ rename_map <- c(
 # 4. PLOTTING FUNCTION
 # ==========================================
 color_palette <- c(
-  "Placebo" = "#999999", 
-  "C. asiatica" = "#e6c60d", 
-  "Fiber-enriched C. asiatica" = "#5ca08e"
+  "Placebo (CON)" = "#999999", 
+  "Gotu kola juice-only (GKJ)" = "#e6c60d", 
+  "Fiber-enriched Gotu kola juice (F-GKJ)" = "#5ca08e"
 )
 
 data_long <- input_data_raw %>%
@@ -83,9 +83,9 @@ p_average <- ggplot(data_long, aes(x = Weeks, y = Value, color = Treatments, gro
   scale_color_manual(
     values = color_palette,
     labels = c(
-      "Placebo" = "Placebo",
-      "C. asiatica" = expression(italic("C. asiatica")),
-      "Fiber-enriched C. asiatica" = expression(paste("Fiber-enriched ", italic("C. asiatica")))
+      "Placebo (CON)" = "Placebo (CON)",
+      "Gotu kola juice-only (GKJ)" = "Gotu kola juice-only (GKJ)",
+      "Fiber-enriched Gotu kola juice (F-GKJ)" = "Fiber-enriched Gotu kola\njuice (F-GKJ)"
     )
   ) +
   

@@ -23,27 +23,36 @@ Met      <- read_excel(MET_MIC, sheet = "Met")
 # ==========================================
 METADATA <- METADATA %>%
   mutate(Treatments_Clean = factor(case_when(
-    grepl("Fiber", Treatments, ignore.case = TRUE) ~ "Fiber-enriched C. asiatica",
-    grepl("Asiatica", Treatments, ignore.case = TRUE) ~ "C. asiatica",
-    TRUE ~ "Placebo"
-  ), levels = c("Placebo", "C. asiatica", "Fiber-enriched C. asiatica")))
+    grepl("Fiber", Treatments, ignore.case = TRUE) ~ "Fiber-enriched Gotu kola juice (F-GKJ)",
+    grepl("Asiatica", Treatments, ignore.case = TRUE) ~ "Gotu kola juice-only (GKJ)",
+    TRUE ~ "Placebo (CON)"
+  ), levels = c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)")))
 
 color_palette <- c(
-  "Placebo" = "#999999",
-  "C. asiatica" = "#e6c60d",
-  "Fiber-enriched C. asiatica" = "#5ca08e"
+  "Placebo (CON)" = "#999999",
+  "Gotu kola juice-only (GKJ)" = "#e6c60d",
+  "Fiber-enriched Gotu kola juice (F-GKJ)" = "#5ca08e"
 )
 
 # ==========================================
 # 3. PLOTTING
 # ==========================================
 FONT <- "Arial"
-class_cols <- list("Total SCFAs" = c(4, 6, 7, 9), "Total CEs" = c(18, 19, 20),
-                   "Total FAs" = 10:16, "Total UTs" = 40)
+class_cols <- list(
+  "Total SCFAs (feces)" = c("Acetic acid", "Propionic acid", "Butanoic acid", "Pentanoic acid",
+                            "2-Methylpropionic acid", "3-Methylbutanoic acid", "2-Methylbutanoic acid"),
+  "Total Cholesterol and CEs (plasma)" = c("total CE", "Cholesterol"),
+  "Total FAs (plasma)"  = "Total Lipid",
+  "Total UTs (plasma)"  = c("p-Cresolsulfate", "Phenysulfate", "Indoxyl sulfate", "2-Methoxyphenylsulfate",
+                            "Hippuric acid", "Cinnamoylglycine", "m-Hydroxyhippuric acid",
+                            "Phenylacetyl-L-glutamine", "Trimethylamine N-oxide", "Dimethylglycine"))
+class_units <- c("Total SCFAs (feces)" = "µmol/g\n(wet weight)", "Total Cholesterol and CEs (plasma)" = "µM",
+                 "Total FAs (plasma)" = "µM", "Total UTs (plasma)" = "µM")
 
 df_plot <- bind_rows(lapply(names(class_cols), function(cl) {
+  vals <- Met %>% select(all_of(class_cols[[cl]])) %>% mutate(across(everything(), as.numeric))
   Met %>%
-    mutate(Total_Val = rowSums(select(., all_of(colnames(Met)[class_cols[[cl]]])), na.rm = TRUE)) %>%
+    mutate(Total_Val = ifelse(rowSums(!is.na(vals)) == 0, NA, rowSums(vals, na.rm = TRUE))) %>%
     select(ID, Total_Val) %>%
     mutate(Class = cl)
 })) %>%
@@ -53,18 +62,20 @@ df_plot <- bind_rows(lapply(names(class_cols), function(cl) {
   filter(!is.na(Treatments_Clean))
 
 facet_labels <- c(
-  "Placebo"                    = "Placebo",
-  "C. asiatica"                = "*C. asiatica*",
-  "Fiber-enriched C. asiatica" = "Fiber-<br>enriched<br>*C. asiatica*"
+  "Placebo (CON)"                    = "CON",
+  "Gotu kola juice-only (GKJ)"                = "GKJ",
+  "Fiber-enriched Gotu kola juice (F-GKJ)" = "F-GKJ"
 )
 
 plot_class <- function(cl) {
-  ggplot(filter(df_plot, Class == cl), aes(x = Weeks, y = Total_Val, fill = Treatments_Clean)) +
+  ggplot(filter(df_plot, Class == cl, !is.na(Total_Val)), aes(x = Weeks, y = Total_Val, fill = Treatments_Clean)) +
     geom_boxplot(outlier.shape = NA, width = 0.6, alpha = 0.7, color = "black", linewidth = 0.25) +
     geom_jitter(width = 0.2, alpha = 0.5, size = 0.25, color = "black") +
     facet_grid(. ~ Treatments_Clean, labeller = as_labeller(facet_labels)) +
     scale_fill_manual(values = color_palette) +
-    labs(title = cl, y = NULL, x = NULL) +
+    (if (cl == "Total UTs (plasma)") scale_y_log10(breaks = c(1, 10, 100, 1000), labels = c("1", "10", "100", "1000"))
+     else scale_y_continuous()) +
+    labs(title = cl, y = class_units[[cl]], x = NULL) +
     theme_bw(base_size = 7, base_family = FONT) +
     theme(
       panel.grid.major = element_blank(),
@@ -74,6 +85,7 @@ plot_class <- function(cl) {
       legend.position = "none",
       plot.title = element_text(hjust = 0.5, size = 8, face = "bold", margin = margin(0, 0, 1, 0)),
       plot.title.position = "plot",
+      axis.title.y = element_text(size = 8, face = "bold", margin = margin(0, 0.5, 0, 0, "mm")),
       axis.text = element_text(size = 7, colour = "black"),
       axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7),
       panel.spacing.x = unit(0.6, "mm"),

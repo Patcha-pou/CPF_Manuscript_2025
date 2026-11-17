@@ -17,22 +17,8 @@ P_CUT <- 0.05
 
 FONT_BASE     <- 14
 COUNT_SIZE_MM <- FONT_BASE / ggplot2::.pt
-ITALIC_TAXON  <- "C. asiatica"
 Y_LAB         <- "Number of correlations"
 
-set_labeller <- function(x) {
-  pattern <- gsub("\\.", "\\\\.", ITALIC_TAXON)
-  out <- vapply(as.character(x), function(s) {
-    if (!grepl(pattern, s)) return(sprintf("'%s'", s))
-    prefix <- trimws(sub(paste0(pattern, ".*$"), "", s))
-    if (nzchar(prefix)) {
-      sprintf("paste('%s ', italic('%s'))", prefix, ITALIC_TAXON)
-    } else {
-      sprintf("italic('%s')", ITALIC_TAXON)
-    }
-  }, character(1), USE.NAMES = FALSE)
-  parse(text = out)
-}
 
 upset_themes_md <- upset_default_themes(
   text      = element_text(size = FONT_BASE),
@@ -40,17 +26,18 @@ upset_themes_md <- upset_default_themes(
 )
 
 GROUP_LABELS <- c(
-  Placebo     = "Placebo",
-  Asiatica    = "C. asiatica",
-  Fiber_added = "Fiber-enriched C. asiatica"
+  Placebo     = "Placebo (CON)",
+  Asiatica    = "Gotu kola juice-only (GKJ)",
+  Fiber_added = "Fiber-enriched Gotu kola juice (F-GKJ)"
 )
+GROUP_TAB <- c(Placebo = "CON", Asiatica = "GKJ", Fiber_added = "FGKJ")
 target_sets <- unname(GROUP_LABELS)
 
 build_membership <- function(week) {
   sheets_avail <- excel_sheets(TABLE_S5)
   
   sig <- lapply(names(GROUP_LABELS), function(g) {
-    sheet <- paste0("Table_S5_Full_W", week, "_", g)
+    sheet <- paste0("Table_S5_Full_W", week, "_", GROUP_TAB[[g]])
     if (!sheet %in% sheets_avail)
       stop("missing sheet '", sheet, "' in ", TABLE_S5,
            " — run FigureS7S8_TableS5.R first", call. = FALSE)
@@ -83,7 +70,6 @@ create_final_upset <- function(data, sets_vector) {
     width_ratio = 0.2,
     sort_intersections = 'ascending',
     sort_sets = FALSE,
-    labeller = set_labeller,
     base_annotations = list(
       'Intersection Size' = intersection_size(
         counts = TRUE,

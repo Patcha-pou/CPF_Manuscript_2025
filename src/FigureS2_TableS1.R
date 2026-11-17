@@ -22,21 +22,21 @@ if (!dir.exists(OUTPUT_DIR)) dir.create(OUTPUT_DIR, recursive = TRUE)
 if (!dir.exists(RESULT_DIR)) dir.create(RESULT_DIR, recursive = TRUE)
 
 # --- 3. Load & Prep Data ---
-group_map <- c("Placebo" = "Placebo",
-               "Asiatica_juice" = "C. asiatica",
-               "Fiber_added_Asiatica_juice" = "fiber-enriched C. asiatica")
+group_map <- c("Placebo" = "Placebo (CON)",
+               "Asiatica_juice" = "Gotu kola juice-only (GKJ)",
+               "Fiber_added_Asiatica_juice" = "Fiber-enriched Gotu kola juice (F-GKJ)")
 
-color_palette <- c("Placebo" = "#999999",
-                   "C. asiatica" = "#e6c60d",
-                   "fiber-enriched C. asiatica" = "#5ca08e")
+color_palette <- c("Placebo (CON)" = "#999999",
+                   "Gotu kola juice-only (GKJ)" = "#e6c60d",
+                   "Fiber-enriched Gotu kola juice (F-GKJ)" = "#5ca08e")
 
 italic_labels <- c(
-  "Placebo" = "Placebo",
-  "C. asiatica" = expression(italic("C. asiatica")),
-  "fiber-enriched C. asiatica" = expression(paste("fiber-enriched ", italic("C. asiatica")))
+  "Placebo (CON)" = "Placebo (CON)",
+  "Gotu kola juice-only (GKJ)" = "Gotu kola juice-only (GKJ)",
+  "Fiber-enriched Gotu kola juice (F-GKJ)" = "Fiber-enriched Gotu kola juice (F-GKJ)"
 )
 
-VARS <- c(Frequency = "Stool frequency", Consistency = "Stool consistency (Bristol score)")
+VARS <- c(Frequency = "Stool frequency\n(Bowel movements/week)", Consistency = "Stool consistency\n(Bristol score)")
 
 stool <- read_excel(file.path(INPUT_DIR, "inputMet_with_enterotype_stool.xlsx"), sheet = "METADATA") %>%
   transmute(ID, Subject = factor(Subject),
@@ -87,8 +87,8 @@ fit_did <- function(d, ref) {
 
 between_group <- stool_long %>%
   group_by(Variable) %>%
-  group_modify(~ bind_rows(fit_did(.x, "Placebo"),
-                           fit_did(.x, "C. asiatica") %>% filter(grepl("^fiber-enriched", Contrast)))) %>%
+  group_modify(~ bind_rows(fit_did(.x, "Placebo (CON)"),
+                           fit_did(.x, "Gotu kola juice-only (GKJ)") %>% filter(grepl("^Fiber-enriched", Contrast)))) %>%
   ungroup() %>%
   group_by(Variable) %>% mutate(q_value = p.adjust(p_value, method = "BH")) %>% ungroup() %>%
   mutate(N_participants = n_distinct(stool$Subject)) %>%
@@ -101,6 +101,31 @@ overall <- stool_long %>%
     data.frame(Term = rownames(a), as.data.frame(a), row.names = NULL, check.names = FALSE)
   }) %>%
   ungroup()
+
+# --- 4b. Clinical markers (BloodTest.csv, all participants): Group x Week DiD ---
+CLIN <- c("Cholesterol (total)" = "TC (mg/dL)", "HDL-Cholesterol" = "HDL-C (mg/dL)",
+          "LDL Cholesterol (calculated)" = "LDL-C (mg/dL)", "Triglyceride (lipid-TG)" = "TG (mg/dL)",
+          "Fasting plasma Glucose" = "FPG (mg/dL)")
+clin_group <- c(Control = "Placebo (CON)", Asiatica = "Gotu kola juice-only (GKJ)",
+                "Fiber added" = "Fiber-enriched Gotu kola juice (F-GKJ)")
+clin_long <- read.csv(file.path(INPUT_DIR, "BloodTest.csv"), check.names = FALSE, fileEncoding = "UTF-8-BOM") %>%
+  pivot_longer(-c(ID, Group), names_to = "col", values_to = "Value") %>%
+  mutate(col = gsub("\\s+", " ", col),
+         Marker = sub(" Week \\d$", "", col),
+         Week = factor(paste0("W", sub("^.* Week (\\d)$", "\\1", col)), levels = c("W0", "W2", "W4")),
+         Variable = factor(CLIN[Marker], levels = CLIN),
+         Subject = factor(ID),
+         Group = factor(clin_group[Group], levels = names(color_palette)))
+stopifnot(!anyNA(clin_long$Variable), !anyNA(clin_long$Group), !anyNA(clin_long$Week))
+
+clinical_did <- clin_long %>%
+  group_by(Variable) %>%
+  group_modify(~ bind_rows(fit_did(.x, "Placebo (CON)"),
+                           fit_did(.x, "Gotu kola juice-only (GKJ)") %>% filter(grepl("^Fiber-enriched", Contrast)))) %>%
+  ungroup() %>%
+  group_by(Variable) %>% mutate(q_value = p.adjust(p_value, method = "BH")) %>% ungroup() %>%
+  mutate(N_participants = n_distinct(clin_long$Subject)) %>%
+  select(Variable, Contrast, Week, DiD = Estimate, SE, CI95_lower, CI95_upper, df, p_value, q_value, N_participants)
 
 # --- 5. Table S1 ---
 wb <- createWorkbook()
@@ -116,10 +141,12 @@ add_sheet(wb, "Descriptive", descriptive)
 add_sheet(wb, "Within_group", within_group)
 add_sheet(wb, "Between_group_DiD", between_group)
 add_sheet(wb, "Overall_LMM", overall)
+add_sheet(wb, "Clinical_DiD", clinical_did)
 saveWorkbook(wb, file.path(OUTPUT_DIR, "Table_S1.xlsx"), overwrite = TRUE)
 cat("Wrote", file.path(OUTPUT_DIR, "Table_S1.xlsx"), "\n")
 
 # --- 6. Figure S2 ---
+set.seed(123)
 FONT <- "Arial"
 make_panel <- function(var) {
   ggplot(filter(stool_long, Variable == var), aes(x = Week, y = Value, fill = Group)) +

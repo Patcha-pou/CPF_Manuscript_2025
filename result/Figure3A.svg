@@ -441,12 +441,11 @@
 <text x='192.81' y='313.58' text-anchor='middle' style='font-size: 7.00px; font-family: "Arial";' textLength='10.50px' lengthAdjust='spacingAndGlyphs'>W2</text>
 <text x='227.47' y='313.58' text-anchor='middle' style='font-size: 7.00px; font-family: "Arial";' textLength='10.50px' lengthAdjust='spacingAndGlyphs'>W4</text>
 <rect x='25.51' y='1.42' width='69.31' height='17.01' style='stroke-width: 0.38; fill: #FFFFFF;' />
-<text x='60.17' y='12.43' text-anchor='middle' style='font-size: 7.00px; font-weight: bold; font-family: "Arial";' textLength='26.84px' lengthAdjust='spacingAndGlyphs'>Placebo</text>
+<text x='60.17' y='12.43' text-anchor='middle' style='font-size: 7.00px; font-weight: bold; font-family: "Arial";' textLength='15.56px' lengthAdjust='spacingAndGlyphs'>CON</text>
 <rect x='100.50' y='1.42' width='69.31' height='17.01' style='stroke-width: 0.38; fill: #FFFFFF;' />
-<text x='118.82' y='12.43' style='font-size: 7.00px; font-style: italic; font-family: "Arial";' textLength='32.67px' lengthAdjust='spacingAndGlyphs'>C. asiatica</text>
+<text x='135.15' y='12.43' text-anchor='middle' style='font-size: 7.00px; font-weight: bold; font-family: "Arial";' textLength='14.39px' lengthAdjust='spacingAndGlyphs'>GKJ</text>
 <rect x='175.48' y='1.42' width='69.31' height='17.01' style='stroke-width: 0.38; fill: #FFFFFF;' />
-<text x='210.14' y='8.69' text-anchor='middle' style='font-size: 7.00px; font-weight: bold; font-family: "Arial";' textLength='48.61px' lengthAdjust='spacingAndGlyphs'>Fiber-enriched</text>
-<text x='193.80' y='16.17' style='font-size: 7.00px; font-style: italic; font-family: "Arial";' textLength='32.67px' lengthAdjust='spacingAndGlyphs'>C. asiatica</text>
+<text x='210.14' y='12.43' text-anchor='middle' style='font-size: 7.00px; font-weight: bold; font-family: "Arial";' textLength='21.00px' lengthAdjust='spacingAndGlyphs'>F-GKJ</text>
 <text x='46.05' y='333.57' style='font-size: 8.00px; font-weight: bold; font-family: "Arial";' textLength='94.28px' lengthAdjust='spacingAndGlyphs'>log2 fold change (vs W0)</text>
 <text x='155.38' y='337.59' text-anchor='middle' style='font-size: 7.00px; font-family: "Arial";' textLength='17.83px' lengthAdjust='spacingAndGlyphs'>≤ -1.5</text>
 <text x='188.82' y='337.59' text-anchor='middle' style='font-size: 7.00px; font-family: "Arial";' textLength='3.89px' lengthAdjust='spacingAndGlyphs'>0</text>

@@ -15,12 +15,13 @@ if (!dir.exists(RESULT_DIR)) dir.create(RESULT_DIR, recursive = TRUE)
 P_SHOW <- 0.05
 Q_CUT  <- 0.05
 
-GROUP_LV  <- c("Placebo", "C. asiatica", "Fiber-enriched C. asiatica")
-GROUP_MAP <- c(Placebo = "Placebo", Asiatica = "C. asiatica",
-               Fiber_added = "Fiber-enriched C. asiatica")
-ARM_ID <- c("Placebo" = "Pla", "C. asiatica" = "CA", "Fiber-enriched C. asiatica" = "FCA")
-PAL <- c("Placebo" = "#999999", "C. asiatica" = "#e6c60d",
-         "Fiber-enriched C. asiatica" = "#5ca08e")
+GROUP_LV  <- c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)")
+GROUP_MAP <- c(Placebo = "Placebo (CON)", Asiatica = "Gotu kola juice-only (GKJ)",
+               Fiber_added = "Fiber-enriched Gotu kola juice (F-GKJ)")
+ARM_ID <- c("Placebo (CON)" = "Pla", "Gotu kola juice-only (GKJ)" = "CA", "Fiber-enriched Gotu kola juice (F-GKJ)" = "FCA")
+PAL <- c("Placebo (CON)" = "#999999", "Gotu kola juice-only (GKJ)" = "#e6c60d",
+         "Fiber-enriched Gotu kola juice (F-GKJ)" = "#5ca08e")
+CONTRAST_TAB <- c("CA-Pla" = "GKJ vs CON", "FCA-Pla" = "F-GKJ vs CON", "FCA-CA" = "F-GKJ vs GKJ")
 COL_LV <- c("CA-Pla W2", "CA-Pla W4", "FCA-Pla W2", "FCA-Pla W4", "FCA-CA W2", "FCA-CA W4")
 
 # --- 2. Metadata (covariates as in Maaslin2.R: Age, BMI, Gender, Energy) -----
@@ -67,8 +68,8 @@ run_did <- function(data, ref, layer) {
 }
 
 did_all <- bind_rows(
-  run_did(rel, "Placebo", "Mic_DiD"),
-  run_did(rel, "C. asiatica", "Mic_DiD") %>% filter(contrast == "FCA-CA")) %>%
+  run_did(rel, "Placebo (CON)", "Mic_DiD"),
+  run_did(rel, "Gotu kola juice-only (GKJ)", "Mic_DiD") %>% filter(contrast == "FCA-CA")) %>%
   mutate(lower.CL = coef - qnorm(0.975) * stderr, upper.CL = coef + qnorm(0.975) * stderr) %>%
   left_join(TAXA, by = "feature") %>%
   relocate(label, Phylum, .after = feature)
@@ -86,9 +87,32 @@ add_sheet <- function(wb, name, df) {
 }
 add_sheet(wb, "Genus_DiD", did_all %>%
   arrange(contrast, week, pval) %>%
-  transmute(Genus = label, Phylum, Feature = feature, Contrast = contrast, Week = week,
+  transmute(Genus = label, Phylum, Feature = feature, Contrast = unname(CONTRAST_TAB[contrast]), Week = week,
             DiD_log2FC = coef, SE = stderr, CI95_lower = lower.CL, CI95_upper = upper.CL,
             p_value = pval, q_value = qval, N))
+
+# Within-group changes (Weeks 2 and 4 vs Week 0) from the per-arm MaAsLin2 runs of Maaslin2.R
+ARM_DIR <- c("Placebo (CON)" = "output_Placebo", "Gotu kola juice-only (GKJ)" = "output_Asiatica",
+             "Fiber-enriched Gotu kola juice (F-GKJ)" = "output_Fiber_added")
+genera <- distinct(did_all, feature, label, Phylum)
+within_all <- bind_rows(lapply(names(ARM_DIR), function(g) {
+  read.delim(file.path(OUTPUT_DIR, "Mic", ARM_DIR[[g]], "all_results.tsv")) %>%
+    filter(metadata == "Weeks", feature %in% genera$feature) %>%
+    mutate(Group = g)
+})) %>%
+  left_join(genera, by = "feature") %>%
+  mutate(Group = factor(Group, levels = GROUP_LV)) %>%
+  arrange(Group, value, pval) %>%
+  transmute(Genus = label, Phylum, Feature = feature, Group, Comparison = paste(value, "vs W0"),
+            log2FC = coef, SE = stderr, CI95_lower = coef - qnorm(0.975) * stderr,
+            CI95_upper = coef + qnorm(0.975) * stderr, p_value = pval, q_value = qval, N)
+add_sheet(wb, "Within_group", within_all)
+
+# Relative abundance of each genus in each sample (genera of Genus_DiD)
+add_sheet(wb, "Individual_values", mf0 %>%
+  transmute(SampleID, Subject, Group = factor(Group, levels = GROUP_LV), Week = Time) %>%
+  bind_cols(setNames(as.data.frame(rel[, genera$feature]), genera$label)) %>%
+  arrange(Group, Subject, Week))
 saveWorkbook(wb, file.path(OUTPUT_DIR, "Table_S3.xlsx"), overwrite = TRUE)
 cat("Wrote", file.path(OUTPUT_DIR, "Table_S3.xlsx"), "\n")
 message("Genera tested: ", n_distinct(did_all$feature),
@@ -98,7 +122,7 @@ message("Genera tested: ", n_distinct(did_all$feature),
 # --- 5. Figure (A: Figure 3A heatmap style, B: Figure 3B line style) --------
 FONT <- "Arial"
 gp_txt <- function(size, face = "plain") gpar(fontsize = size, fontface = face, fontfamily = FONT)
-CONTRAST_LAB <- c("CA vs\nPlacebo", "FCA vs\nPlacebo", "FCA vs\nCA")
+CONTRAST_LAB <- c("GKJ vs\nCON", "F-GKJ vs\nCON", "F-GKJ vs\nGKJ")
 
 sel <- did_all %>% filter(pval < P_SHOW) %>% distinct(feature) %>% pull(feature)
 stopifnot(length(sel) > 0)
@@ -176,9 +200,9 @@ pB <- ggplot(traj, aes(Weeks, mean, colour = Group, group = Group)) +
   facet_wrap(~ label, scales = "free_y", ncol = 6,
              labeller = labeller(label = wrap_strip)) +
   scale_colour_manual(values = PAL, labels = c(
-    "Placebo" = "Placebo",
-    "C. asiatica" = expression(italic("C. asiatica")),
-    "Fiber-enriched C. asiatica" = expression("Fiber-enriched"~italic("C. asiatica")))) +
+    "Placebo (CON)" = "Placebo (CON)",
+    "Gotu kola juice-only (GKJ)" = "Gotu kola juice-only (GKJ)",
+    "Fiber-enriched Gotu kola juice (F-GKJ)" = "Fiber-enriched Gotu kola juice (F-GKJ)")) +
   scale_x_continuous(breaks = c(0, 2, 4)) +
   labs(x = "Weeks", y = expression(bold(log[2]~"relative abundance (mean ± SE)"))) +
   theme_bw(base_size = 7, base_family = FONT) +

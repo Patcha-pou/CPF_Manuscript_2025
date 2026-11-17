@@ -15,12 +15,13 @@ if (!dir.exists(RESULT_DIR)) dir.create(RESULT_DIR, recursive = TRUE)
 P_SHOW <- 0.05
 Q_CUT  <- 0.05
 
-GROUP_LV  <- c("Placebo", "C. asiatica", "Fiber-enriched C. asiatica")
-GROUP_MAP <- c(Placebo = "Placebo", Asiatica = "C. asiatica",
-               Fiber_added = "Fiber-enriched C. asiatica")
-ARM_ID <- c("Placebo" = "Pla", "C. asiatica" = "CA", "Fiber-enriched C. asiatica" = "FCA")
-PAL <- c("Placebo" = "#999999", "C. asiatica" = "#e6c60d",
-         "Fiber-enriched C. asiatica" = "#5ca08e")
+GROUP_LV  <- c("Placebo (CON)", "Gotu kola juice-only (GKJ)", "Fiber-enriched Gotu kola juice (F-GKJ)")
+GROUP_MAP <- c(Placebo = "Placebo (CON)", Asiatica = "Gotu kola juice-only (GKJ)",
+               Fiber_added = "Fiber-enriched Gotu kola juice (F-GKJ)")
+ARM_ID <- c("Placebo (CON)" = "Pla", "Gotu kola juice-only (GKJ)" = "CA", "Fiber-enriched Gotu kola juice (F-GKJ)" = "FCA")
+PAL <- c("Placebo (CON)" = "#999999", "Gotu kola juice-only (GKJ)" = "#e6c60d",
+         "Fiber-enriched Gotu kola juice (F-GKJ)" = "#5ca08e")
+CONTRAST_TAB <- c("CA-Pla" = "GKJ vs CON", "FCA-Pla" = "F-GKJ vs CON", "FCA-CA" = "F-GKJ vs GKJ")
 COL_LV <- c("CA-Pla W2", "CA-Pla W4", "FCA-Pla W2", "FCA-Pla W4", "FCA-CA W2", "FCA-CA W4")
 
 # --- 2. Metadata (covariates as in Maaslin2.R: Age, BMI, Gender, Energy) -----
@@ -50,6 +51,12 @@ FEATURES <- tibble(
     TRUE ~ "UTs"),
   Compartment = ifelse(Class == "SCFAs", "Feces", "Plasma"))
 print(FEATURES %>% count(Compartment, Class))
+
+missing_tab <- FEATURES %>%
+  transmute(Metabolite = label, Compartment, Class) %>%
+  mutate(N_samples = nrow(met), N_missing = colSums(is.na(met)),
+         Percent_missing = round(100 * N_missing / N_samples, 1)) %>%
+  filter(!Metabolite %in% c("Total CE", "Total lipid"))
 
 set.seed(123)
 if (anyNA(met)) {
@@ -85,11 +92,12 @@ run_did <- function(data, ref, layer) {
 }
 
 did_all <- bind_rows(
-  run_did(met, "Placebo", "Met_DiD"),
-  run_did(met, "C. asiatica", "Met_DiD") %>% filter(contrast == "FCA-CA")) %>%
+  run_did(met, "Placebo (CON)", "Met_DiD"),
+  run_did(met, "Gotu kola juice-only (GKJ)", "Met_DiD") %>% filter(contrast == "FCA-CA")) %>%
   mutate(lower.CL = coef - qnorm(0.975) * stderr, upper.CL = coef + qnorm(0.975) * stderr) %>%
   left_join(FEATURES, by = "feature") %>%
-  relocate(name, label, Compartment, Class, .after = feature)
+  relocate(name, label, Compartment, Class, .after = feature) %>%
+  filter(!label %in% c("Total CE", "Total lipid"))   # totals modelled with the rest (q unchanged) but not reported
 
 # --- Table S4 ---
 wb <- createWorkbook()
@@ -107,9 +115,10 @@ for (comp in c("Feces", "Plasma"))
     filter(Compartment == comp) %>%
     mutate(Class = factor(Class, levels = c("SCFAs", "CEs", "FAs", "UTs"))) %>%
     arrange(contrast, week, Class, pval) %>%
-    transmute(Metabolite = label, Class, Contrast = contrast, Week = week,
+    transmute(Metabolite = label, Class, Contrast = unname(CONTRAST_TAB[contrast]), Week = week,
               DiD_log2FC = coef, SE = stderr, CI95_lower = lower.CL, CI95_upper = upper.CL,
               p_value = pval, q_value = qval, N))
+add_sheet(wb, "Missing_values", missing_tab)
 saveWorkbook(wb, file.path(OUTPUT_DIR, "Table_S4.xlsx"), overwrite = TRUE)
 cat("Wrote", file.path(OUTPUT_DIR, "Table_S4.xlsx"), "\n")
 message("Metabolites with p<", P_SHOW, " in any contrast: ",
@@ -118,7 +127,7 @@ message("Metabolites with p<", P_SHOW, " in any contrast: ",
 
 FONT <- "Arial"
 gp_txt <- function(size, face = "plain") gpar(fontsize = size, fontface = face, fontfamily = FONT)
-CONTRAST_LAB <- c("CA vs\nPlacebo", "FCA vs\nPlacebo", "FCA vs\nCA")
+CONTRAST_LAB <- c("GKJ vs\nCON", "F-GKJ vs\nCON", "F-GKJ vs\nGKJ")
 CLASS_LV <- c("SCFAs", "CEs", "FAs", "UTs")
 UNIT <- c(Feces = "µmol/g", Plasma = "µM")
 
@@ -218,9 +227,9 @@ make_figure <- function(comp, stem) {
     facet_wrap(~ label, scales = "free_y", ncol = ncol_B,
                labeller = labeller(label = wrap_strip)) +
     scale_colour_manual(values = PAL, labels = c(
-      "Placebo" = "Placebo",
-      "C. asiatica" = expression(italic("C. asiatica")),
-      "Fiber-enriched C. asiatica" = expression("Fiber-enriched"~italic("C. asiatica")))) +
+      "Placebo (CON)" = "Placebo (CON)",
+      "Gotu kola juice-only (GKJ)" = "Gotu kola juice-only (GKJ)",
+      "Fiber-enriched Gotu kola juice (F-GKJ)" = "Fiber-enriched Gotu kola juice (F-GKJ)")) +
     scale_x_continuous(breaks = c(0, 2, 4)) +
     labs(x = "Weeks", y = paste0(UNIT[[comp]], " (median, IQR)")) +
     theme_bw(base_size = 7, base_family = FONT) +

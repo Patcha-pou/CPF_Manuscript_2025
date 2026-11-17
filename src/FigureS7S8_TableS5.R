@@ -21,6 +21,7 @@ clinical   <- read_excel(FILE_PATH, sheet = "Clinical")
 fecal_met  <- read_excel(FILE_PATH, sheet = "Fecal_Metabolites (uM)")
 
 GROUPS <- c(A = "Placebo", B = "Asiatica", C = "Fiber_added")
+GROUP_TAB <- c(Placebo = "CON", Asiatica = "GKJ", Fiber_added = "FGKJ")
 P_CUT  <- 0.05
 TOP_N  <- 25
 MIN_N  <- 6
@@ -116,7 +117,7 @@ BREAKS <- seq(-1, 1, length.out = 101)
 CELL_W  <- 52
 CELL_H  <- 20
 FS      <- 15
-TITLE_H <- 0.55
+TITLE_H <- 1.0
 
 make_heatmap <- function(mat, title) {
   ph <- pheatmap(mat,
@@ -175,8 +176,10 @@ save_figure <- function(panels, stem) {
 }
 
 # --- 5. Execution -------------------------------------------------------------
+GROUP_LAB <- c(Placebo = "Placebo (CON)", Asiatica = "Gotu kola juice-only (GKJ)",
+               Fiber_added = "Fiber-enriched Gotu kola juice (F-GKJ)")
 make_title <- function(group_name, week)
-  paste0("Top 25 Delta correlations (rho) – ", group_name,
+  paste0("Top 25 Delta correlations (rho)\n", GROUP_LAB[[group_name]],
          " (Week ", week, " vs Week 0)")
 
 figs <- list(S7 = 2, S8 = 4)
@@ -200,19 +203,20 @@ for (fig in names(figs)) {
     res <- build_matrix(dat)
     panels[[panel]] <- make_heatmap(res$mat, make_title(grp, wk))
     
-    full_tabs[[paste0("Table_S5_Full_W", wk, "_", grp)]] <- res$full
+    full_tabs[[paste0("Table_S5_Full_W", wk, "_", GROUP_TAB[[grp]])]] <- res$full
   }
   
   if (length(panels) > 0) save_figure(panels, paste0("Fig_", fig))
 }
 
-# --- 5b. Repeated-measures correlation across all samples --------------------
-rm_cor <- function(x, y, subj) {
-  fit <- lm(y ~ factor(subj) + x)
-  a   <- anova(fit)
-  ss_x <- a["x", "Sum Sq"]; ss_r <- a["Residuals", "Sum Sq"]
-  data.frame(r = sign(coef(fit)[["x"]]) * sqrt(ss_x / (ss_x + ss_r)),
-             df = a["Residuals", "Df"], p = a["x", "Pr(>F)"])
+# --- 5b. Mixed model across all samples: metabolite ~ genus + Week + (1|Subject)
+lmm_fit <- function(x, y, week, subj) {
+  d <- data.frame(x = as.numeric(scale(x)), y = y, Week = factor(week), Subject = factor(subj))
+  fit <- suppressMessages(lmerTest::lmer(y ~ x + Week + (1 | Subject), data = d,
+                                         control = lme4::lmerControl(check.conv.singular = "ignore")))
+  cf <- summary(fit)$coefficients["x", ]
+  data.frame(beta = cf[["Estimate"]], SE = cf[["Std. Error"]], df = cf[["df"]],
+             p = cf[["Pr(>|t|)"]], N_samples = nrow(d), N_subjects = nlevels(d$Subject))
 }
 
 all_ids   <- clinical$SampleID[clinical$SampleID %in% names(microbe_df) &
@@ -228,25 +232,87 @@ met_all   <- t(apply(log1p(met_all[, all_ids]), 1, scale))
 colnames(met_all) <- all_ids
 meta_all  <- clinical[match(all_ids, clinical$SampleID), ]
 
+subsets <- c(lapply(GROUPS, function(g) meta_all$Treatments == g),
+             list(W2 = meta_all$Weeks %in% c(0, 2), W4 = meta_all$Weeks %in% c(0, 4)))
+names(subsets) <- c(GROUP_TAB[GROUPS], "W2", "W4")
+
 rm_all <- map_dfr(rownames(met_all), function(met) {
   map_dfr(rownames(clr_all), function(mic) {
-    arm <- lapply(GROUPS, function(g) {
-      k <- meta_all$Treatments == g
-      rm_cor(clr_all[mic, k], met_all[met, k], meta_all$Subject[k])
+    sub <- map_dfr(names(subsets), function(s) {
+      k <- subsets[[s]]
+      f <- lmm_fit(clr_all[mic, k], met_all[met, k], meta_all$Weeks[k], meta_all$Subject[k])
+      data.frame(set = s, beta = f$beta, p = f$p)
     })
+    sub_wide <- setNames(c(sub$beta, sub$p), c(paste0("beta_", sub$set), paste0("p_", sub$set)))
     cbind(data.frame(Microbe = mic, Metabolite = met),
-          rm_cor(clr_all[mic, ], met_all[met, ], meta_all$Subject),
-          r_Placebo = arm$A$r, p_Placebo = arm$A$p,
-          r_Asiatica = arm$B$r, p_Asiatica = arm$B$p,
-          r_Fiber_added = arm$C$r, p_Fiber_added = arm$C$p)
+          lmm_fit(clr_all[mic, ], met_all[met, ], meta_all$Weeks, meta_all$Subject),
+          as.data.frame(as.list(sub_wide)))
   })
 }) %>%
   mutate(p.adj = p.adjust(p, method = "BH")) %>%
   relocate(p.adj, .after = p) %>%
   arrange(p)
 full_tabs[["Table_S5_All_samples"]] <- rm_all
-message("All-sample rmcorr: ", nrow(rm_all), " pairs, ", sum(rm_all$p < 0.05),
+message("All-sample mixed model: ", nrow(rm_all), " pairs, ", sum(rm_all$p < 0.05),
         " with p < 0.05, ", sum(rm_all$p.adj < 0.05), " with q < 0.05")
+
+# --- 5b2. Sensitivity analysis: all-sample model with treatment as a fixed effect
+grp_fit <- function(x, y, week, subj, grp) {
+  d <- data.frame(x = as.numeric(scale(x)), y = y, Week = factor(week), Subject = factor(subj),
+                  Group = factor(grp, levels = GROUPS))
+  fit <- suppressMessages(lmerTest::lmer(y ~ x + Week + Group + (1 | Subject), data = d,
+                                         control = lme4::lmerControl(check.conv.singular = "ignore")))
+  cf <- summary(fit)$coefficients["x", ]
+  data.frame(beta = cf[["Estimate"]], SE = cf[["Std. Error"]], df = cf[["df"]], p = cf[["Pr(>|t|)"]])
+}
+rm_grp <- map_dfr(rownames(met_all), function(met) {
+  map_dfr(rownames(clr_all), function(mic) {
+    cbind(data.frame(Microbe = mic, Metabolite = met),
+          grp_fit(clr_all[mic, ], met_all[met, ], meta_all$Weeks, meta_all$Subject, meta_all$Treatments))
+  })
+}) %>%
+  mutate(p.adj = p.adjust(p, method = "BH")) %>%
+  left_join(rm_all %>% select(Microbe, Metabolite, beta_without_group = beta, p.adj_without_group = p.adj),
+            by = c("Microbe", "Metabolite")) %>%
+  relocate(p.adj, .after = p) %>%
+  arrange(p)
+full_tabs[["Table_S5_All_samples_Group"]] <- rm_grp
+message("All-sample model + treatment: ", sum(rm_grp$p < 0.05), " with p < 0.05, ",
+        sum(rm_grp$p.adj < 0.05), " with q < 0.05")
+
+# --- 5c. Genus x Group interaction: does the association differ between groups?
+int_fit <- function(x, y, week, subj, grp, ref) {
+  d <- data.frame(x = as.numeric(scale(x)), y = y, Week = factor(week), Subject = factor(subj),
+                  Group = relevel(factor(grp, levels = GROUPS), ref = ref))
+  fit <- suppressMessages(lmerTest::lmer(y ~ x * Group + Week + (1 | Subject), data = d,
+                                         control = lme4::lmerControl(check.conv.singular = "ignore")))
+  list(cf = summary(fit)$coefficients, p_int = anova(fit)["x:Group", "Pr(>F)"])
+}
+
+int_all <- map_dfr(rownames(met_all), function(met) {
+  map_dfr(rownames(clr_all), function(mic) {
+    args <- list(clr_all[mic, ], met_all[met, ], meta_all$Weeks, meta_all$Subject, meta_all$Treatments)
+    a <- do.call(int_fit, c(args, ref = GROUPS[["A"]]))
+    b <- do.call(int_fit, c(args, ref = GROUPS[["B"]]))
+    term <- function(res, g) res$cf[paste0("x:Group", g), ]
+    data.frame(Microbe = mic, Metabolite = met, p_interaction = a$p_int,
+               diff_GKJ_vs_CON = term(a, GROUPS[["B"]])[["Estimate"]],
+               p_GKJ_vs_CON = term(a, GROUPS[["B"]])[["Pr(>|t|)"]],
+               diff_FGKJ_vs_CON = term(a, GROUPS[["C"]])[["Estimate"]],
+               p_FGKJ_vs_CON = term(a, GROUPS[["C"]])[["Pr(>|t|)"]],
+               diff_FGKJ_vs_GKJ = term(b, GROUPS[["C"]])[["Estimate"]],
+               p_FGKJ_vs_GKJ = term(b, GROUPS[["C"]])[["Pr(>|t|)"]])
+  })
+}) %>%
+  mutate(q_interaction = p.adjust(p_interaction, method = "BH"),
+         q_GKJ_vs_CON = p.adjust(p_GKJ_vs_CON, method = "BH"),
+         q_FGKJ_vs_CON = p.adjust(p_FGKJ_vs_CON, method = "BH"),
+         q_FGKJ_vs_GKJ = p.adjust(p_FGKJ_vs_GKJ, method = "BH")) %>%
+  relocate(q_interaction, .after = p_interaction) %>%
+  arrange(p_interaction)
+full_tabs[["Table_S5_Interaction"]] <- int_all
+message("Genus x Group interaction: ", nrow(int_all), " pairs, ", sum(int_all$p_interaction < 0.05),
+        " with p < 0.05, ", sum(int_all$q_interaction < 0.05), " with q < 0.05")
 
 # --- 6. Append full correlation stats to Table_S5.xlsx ------------------------
 if (length(full_tabs) > 0) {

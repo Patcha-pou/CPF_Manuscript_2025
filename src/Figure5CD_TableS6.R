@@ -74,7 +74,7 @@ get_delta_data <- function(time_target) {
 
 # --- 2b. Edge statistics: read back from Table S5 -----------------------------
 read_cor_stats <- function(week) {
-  sheet <- paste0("Table_S5_Full_W", week, "_", GROUP)
+  sheet <- paste0("Table_S5_Full_W", week, "_FGKJ")
   if (!file.exists(TABLE_S5))
     stop("missing ", TABLE_S5, " — run FigureS7S8_TableS5.R first", call. = FALSE)
   if (!sheet %in% excel_sheets(TABLE_S5))
